@@ -35,20 +35,7 @@
 namespace x4 {
 namespace {
 
-// crt0 at the PS-EXE entry 0x800DAE8C of SLUS_005.61. It has no stack-top bias and keeps the heap
-// size and base in registers only.
-constexpr psx::game::Crt0Image kCrt0{
-    .bss = {0x8012F418u, 0x80175F38u},
-    .stackTopWordAddress = 0x800DAF3Cu,
-    .stackReserveWordAddress = 0x8011CB74u,
-    .heapBase = 0x80175F38u,
-    .heapSizeStoreAddress = 0,
-    .heapBaseStoreAddress = 0,
-    .globalPointer = 0x8012F418u,
-    .libcInitEntry = 0x800EDCDCu, // BIOS A(39h) InitHeap thunk
-    .crt0Entry = 0x800DAE8Cu,
-    .stackBias = {.declared = true, .bytes = 0},
-};
+constexpr psx::game::Crt0Image kCrt0{.entry = 0x800DAE8Cu};
 
 constexpr psx::game::HostIdentity kHostIdentity{
     .cardEnvVar = "PSXPORT_X4_CARD",
@@ -124,7 +111,7 @@ bool Runtime::titleCommand(Core &core, const psx::game::TitleCommandLine &input,
   if (std::string_view(input.command) != "warp") {
     return false;
   }
-  const std::string answer = session(core).stageWarp.arm(input.line);
+  const std::string answer = session(core).stageWarp.arm(input.args);
   std::fprintf(reply, "%s\n", answer.c_str());
   return true;
 }

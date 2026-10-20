@@ -393,9 +393,9 @@ bool Service::change(uint32_t handle) {
   mainRegs_ = static_cast<R3000 &>(core_);
   // Census before the load, so it reports what the task is resumed with.
   ++switchCensus_.resumes;
-  const bool pcIsCode = core_.currentImageIdentity(thread.regs.pc).has_value();
+  const bool pcIsCode = core_.imageCatalog().resolve(thread.regs.pc).has_value();
   const std::uint32_t savedRa = thread.regs.r[31];
-  const bool raIsCode = core_.currentImageIdentity(savedRa).has_value();
+  const bool raIsCode = core_.imageCatalog().resolve(savedRa).has_value();
   (pcIsCode ? switchCensus_.pcInCodeImage : switchCensus_.pcNotInCodeImage) += 1u;
   if (savedRa == 0u) {
     ++switchCensus_.raZero;

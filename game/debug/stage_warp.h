@@ -1,6 +1,7 @@
 // stage_warp.h — the control-channel `warp <stage> [part]` request.
 #pragma once
 
+#include "command_args.h"
 #include "game_runtime.h"
 
 #include <array>
@@ -56,8 +57,8 @@ public:
   }
 
   static bool stageRunning(Core &core);
-  // Parses and arms one command line; the returned text answers the client.
-  std::string arm(const char *line);
+  // The returned text answers the client.
+  std::string arm(const psx::debug::CommandArgs &args);
   // Writes the armed request; the frame driver calls it only at a clean frame boundary.
   void applyArmed(std::uint32_t frame);
 
