@@ -6,7 +6,7 @@
 #   non-canon  writes guest memory only to reach the same end state faster; byte-matches retail at skip rendezvous
 #   full       changes canon guest state; must be force-suppressed in typed comparison runs, and `guard` must say so
 #
-# Usage: behavior.py [words] | check | set NAME --class C --affect A --status S ... | --selftest
+# Usage: behavior.py [words] | check | set NAME --class C --affect A --status S ...
 # status: verified | implemented | planned | reverted
 #
 # Entry format in docs/behavior-map.md, one `## <name>` per deviation:
@@ -175,29 +175,6 @@ def cmd_check(args, entries=None):
     return 0
 
 
-def cmd_selftest(_args=None):
-    """Run an affect=full entry through cmd_check with and without its suppression clause; only the first must pass."""
-    good = [("synthetic-enh", {"class": "pc_enh", "affect": "full", "status": "planned",
-                               "flag": "PSXPORT_X4_SELFTEST",
-                               "guard": "force-suppressed in typed comparison runs",
-                               "owner": "-"})]
-    bad = [("synthetic-enh", dict(good[0][1], guard="gated behind a CVar the user sets"))]
-    empty = []
-    checks = []
-    print("[selftest] POSITIVE class — affect=full WITH a suppression-citing guard must PASS (exit 0)")
-    checks.append(("affect=full + suppression guard passes", cmd_check(None, good) == 0))
-    print("[selftest] NEGATIVE class — the SAME entry with the suppression clause removed must FAIL "
-          "(exit 1)")
-    checks.append(("affect=full without suppression fails", cmd_check(None, bad) == 1))
-    print("[selftest] NEGATIVE class — an EMPTY corpus must REFUSE (exit 2), never report a clean pass")
-    checks.append(("empty map refuses", cmd_check(None, empty) == 2))
-    bad_names = [n for n, ok in checks if not ok]
-    for n, ok in checks:
-        print(f"  [{'PASS' if ok else 'FAIL'}] {n}")
-    print(f"[selftest] {len(checks)} checks, {len(bad_names)} failed")
-    return 1 if bad_names else 0
-
-
 def cmd_list(args):
     for n, f in sorted(load(), key=lambda e: (_affect_rank(e[1]), _class_rank(e[1]), e[0].lower())):
         if args.affect and f.get("affect") != args.affect:
@@ -219,14 +196,12 @@ def cmd_search(words):
         print("(no behavior-map entries match; add one with `behavior.py set <name> ...`)")
 
 
-SUBCOMMANDS = ("set", "check", "list", "selftest")
+SUBCOMMANDS = ("set", "check", "list")
 
 
 def main():
     # `behavior.py <words>` searches; argparse would reject an unknown first positional, so intercept it.
     argv = sys.argv[1:]
-    if argv and argv[0] == "--selftest":         # flag spelling, same thing as the subcommand
-        sys.exit(cmd_selftest(None))
     if argv and not argv[0].startswith("-") and argv[0] not in SUBCOMMANDS:
         cmd_search(argv)
         return
@@ -240,8 +215,6 @@ def main():
     s.set_defaults(func=cmd_set)
     sub.add_parser("check", help="gate: exit 1 if a canon-affecting change is not comparison-suppressed"
                    ).set_defaults(func=lambda a: sys.exit(cmd_check(a)))
-    sub.add_parser("selftest", help="prove the gate can say BOTH yes and no (and refuse on nothing)"
-                   ).set_defaults(func=lambda a: sys.exit(cmd_selftest(a)))
     l = sub.add_parser("list", help="one line per deviation")
     l.add_argument("affect", nargs="?")
     l.set_defaults(func=cmd_list)

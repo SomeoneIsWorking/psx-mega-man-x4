@@ -3,7 +3,7 @@ name = "megamanx4-launcher"
 version = "0.1.0"
 description = "Locked bootstrap environment for the Mega Man X4 port"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = ["pillow>=10,<12"]
 
 [tool.uv]
 package = false
