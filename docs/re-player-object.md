@@ -144,8 +144,7 @@ which state function sets up each stage's pools; the checkpoint/respawn writer (
 ## 5. What this unlocks, and what it deliberately does NOT do
 
 - `game/title/player_object.h` provides a READ-ONLY typed lens over these guest blocks
-  (constants + offsets pinned by static_assert + a hermetic test,
-  `tests/test_player_object.cpp`, ctest `x4_player_object`). No guest write, no override,
+  (constants + offsets pinned by static_assert). No guest write, no override,
   no behavior change ships from this step.
 - Byte-match prerequisite: ANY native body transplanted from mmx4 must first
   have a byte-gate proving the substrate body it replaces matches. Nothing here imports one.

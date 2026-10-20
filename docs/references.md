@@ -28,14 +28,8 @@ is AGPL-3.0-or-later as a result (`LICENSE`, `LICENSING.md`).
 SHA-1 against the value it reads out of `external/mmx4/check.us.txt` **at run time** — never a hardcoded
 copy, because a hardcoded copy would silently stop tracking the reference it claims to check. When the
 submodule is absent it SAYS it could not check rather than passing quietly.
-`tools/verify_decomp_targets.py` is the per-module version: it reads `target_path:` from each
-`config/*.splat.yaml` to learn the module's name on the disc, reads the expected hash from
-`check.<variant>.txt`, extracts from OUR disc and compares — printing configs discovered / matched /
-mismatched / unchecked / extract-failed, plus how many of the disc's code images are covered. It refuses
-(exit 2) on a missing submodule or zero configs, and `--selftest` substitutes a wrong hash to prove it
-can report a MISMATCH. (Note the layout difference from the sibling tree it was adapted from:
-rood-reverse states `sha1:` inside each splat.yaml; mmx4 does not, which is why the hash comes from
-`check.*.txt`.)
+Per-module, the expected hash comes from `check.<variant>.txt` and the module's name on the disc from
+`target_path:` in each `config/*.splat.yaml` (mmx4 states no `sha1:` inside the splat.yaml, unlike rood-reverse).
 
 ## Three rules for using it
 
@@ -51,8 +45,7 @@ improvement discovered while reading mmx4 must be **re-derived and described, no
 change genuinely needs a framework hook, add a *generic* seam upstream and keep the X4-specific body
 here. Mark every contaminated file with `// SPDX-License-Identifier: AGPL-3.0-or-later` and
 `// derived from external/mmx4`. `tools/check_license_containment.py` is the automated half — four
-detection classes with Sony-SDK and sibling-tree vocabulary subtracted, a 15-check `--selftest` gating
-both directions, and a printed blind-spot list on every run. **Its blind spot is the leak that actually
+detection classes with Sony-SDK and sibling-tree vocabulary subtracted, and a printed blind-spot list on every run. **Its blind spot is the leak that actually
 worries us**: it catches copy-paste, not a developer who internalises the player-object system from
 `src/main/*.c` and writes the co-op patch into psxport from memory. The mitigation is procedural, not
 automated.
@@ -72,7 +65,7 @@ legitimate reason to lift one. Details and the sparse-checkout recipe: `LICENSIN
   how a port looks finished while nothing is gated.** Nothing in this repo may cite that percentage as
   this port's progress.
 - **It is a PARTIAL supply, and our pin is stale.** Upstream is active (60.85% on 2026-10-13); the pin
-  `1922fcd3` predates most of it. Re-run `tools/verify_decomp_targets.py` after moving the pin.
+  `1922fcd3` predates most of it. Re-extract each module from our disc and compare against `check.<variant>.txt` after moving the pin.
 - **Nothing has been read.** As of 2026-08-12 no AGPL source from it has been read in this repo — only
   its build config (splat yaml, `check.us.txt`, `extract.sh`) and its LICENSE header. The containment
   rule is therefore currently vacuous in the good sense: there is nothing to contain yet.

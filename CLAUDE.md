@@ -58,11 +58,9 @@ features, and `docs/codemap.md` for ownership.
 
 ## Working in this repository
 
-- `tools/verify.py` is the gate (`uv run --frozen python tools/verify.py`). It configures the build,
-  builds `megamanx4_port`, and runs the CTest set: the C++ style policy, the temporal-dependency
-  source and shipping-binary checks, and the `x4_*` hermetic seam tests.
+- There are no unit tests or gates. Build with `CC=clang CXX=clang++ uv run --frozen python
+  external/psxport/tools/port/consumer_build.py --build build/agent --target megamanx4_port`.
 - `tools/live_play.py` and `tools/title_prompts.py` drive a headless run over the control channel:
   input, front-end state, presents, and frame captures. That is how the product is exercised.
-- `tools/verify_task_resume.py` runs the product to its frame cap and asserts a non-frozen picture.
 - A past native run is not Lightrec gameplay evidence. Verify the shipping dispatcher, including a
   reached native override and its scoped original call, before claiming dynarec behavior.
