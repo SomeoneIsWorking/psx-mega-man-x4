@@ -1,8 +1,8 @@
 #include "stream_startup.h"
 
 #include "bios_threads.h"
-#include "c_subsys.h"
 #include "cd_controller.h"
+#include "cd_position.h"
 #include "core.h"
 #include "disc.h"
 #include "execution_services.h"
@@ -67,20 +67,16 @@ void serviceFields(Core &core, FieldService serviceField, std::uint32_t count) {
   }
 }
 
-std::uint8_t bcd(std::uint32_t value) {
-  return static_cast<std::uint8_t>(((value / 10u) << 4u) | (value % 10u));
-}
-
 void writePosition(Core &core, std::uint32_t lba, const std::array<std::uint8_t, 8> &position) {
   for (std::uint32_t byte = 0; byte < position.size(); ++byte) {
     core.mem_w8(kStreamPosition + byte, position[byte]);
   }
 
   // CdlSeekL takes the CdIntToPos location; keep the controller's position in agreement.
-  const std::uint32_t absoluteFrame = lba + 150u;
-  core.mem_w8(kStreamLocation + 0u, bcd(absoluteFrame / (60u * 75u)));
-  core.mem_w8(kStreamLocation + 1u, bcd((absoluteFrame / 75u) % 60u));
-  core.mem_w8(kStreamLocation + 2u, bcd(absoluteFrame % 75u));
+  const std::array<std::uint8_t, 3> msf = psx::cd::lbaToMsf(static_cast<int>(lba));
+  for (std::uint32_t byte = 0; byte < msf.size(); ++byte) {
+    core.mem_w8(kStreamLocation + byte, msf[byte]);
+  }
 }
 
 bool startNativeCdStream(Core &core, const StreamRequest &request, FieldService serviceField) {
@@ -99,7 +95,7 @@ bool startNativeCdStream(Core &core, const StreamRequest &request, FieldService 
   const std::uint8_t file = static_cast<std::uint8_t>(core.mem_r8(request.filter));
   const std::uint8_t channel = static_cast<std::uint8_t>(core.mem_r8(request.filter + 1u));
   game.xa.stop();
-  game.xa.setFilter(file, channel);
+  game.cdc.setFilter(file, channel);
   core.r[4] = 3u;
   serviceFields(core, serviceField, 3u);
 
@@ -122,9 +118,7 @@ bool startNativeCdStream(Core &core, const StreamRequest &request, FieldService 
   game.cd.stream_active = 1;
   game.cd.stream_t0_ns = 0;
   game.cd.stream_delivered = 0;
-  game.xa.setLoc(static_cast<std::uint8_t>(core.mem_r8(kStreamLocation + 0u)),
-                 static_cast<std::uint8_t>(core.mem_r8(kStreamLocation + 1u)),
-                 static_cast<std::uint8_t>(core.mem_r8(kStreamLocation + 2u)));
+  game.xa.setLoc(request.lba);
   game.xa.start();
   controller.beginRead(request.lba);
   core.r[4] = 3u;

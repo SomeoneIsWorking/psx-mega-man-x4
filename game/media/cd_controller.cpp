@@ -1,6 +1,5 @@
 #include "cd_controller.h"
 
-#include "c_subsys.h"
 #include "cdc_state.h"
 #include "core.h"
 #include "game.h"
@@ -54,7 +53,6 @@ void setMode(Core &core, std::uint8_t mode) {
     lucent::error("x4-cd-controller", "native controller mode publication requires a bound Game");
     std::abort();
   }
-  core.game->xa.setMode(mode);
   core.game->cdc.setMode(mode);
 }
 
