@@ -1,6 +1,8 @@
 // Title-owned synchronous loader for Mega Man X4's resident CD/archive system.
 #pragma once
 
+#include "cd_position.h"
+
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -36,7 +38,7 @@ enum class Phase : uint8_t {
 // Per-Core state; a second Core must never share a sector cursor or an active-scope bit.
 struct State {
   Phase phase = Phase::Inactive;
-  std::array<uint8_t, 2352> rawSector{};
+  std::array<uint8_t, psx::cd::kRawSectorBytes> rawSector{};
   size_t sectorCursor = 0;
   uint32_t requestId = 0;
   uint32_t requestLba = 0;

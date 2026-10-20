@@ -24,7 +24,6 @@ constexpr uint32_t kLoadState = 0x801406ACu;
 constexpr uint32_t kArchivePostprocessPending = 0x8013BD40u;
 constexpr uint32_t kArchiveProcessedCount = 0x80137CF0u;
 constexpr uint32_t kArchiveEnqueuedCount = 0x80137CF4u;
-constexpr uint32_t kSectorPayloadBytes = 2048u;
 constexpr size_t kRawDataOffset = 12u;
 constexpr uint32_t kArchiveRingSlots = 16u;
 
@@ -72,7 +71,7 @@ void read_request_entry(Core &core, State &load) {
   if (load.requestBytes == 0) {
     refuse("synchronous request", "retail request table reports zero bytes", load);
   }
-  if (load.requestBytes > UINT32_MAX - (kSectorPayloadBytes - 1u)) {
+  if (load.requestBytes > UINT32_MAX - (psx::cd::kDataSectorBytes - 1u)) {
     refuse("synchronous request", "retail request byte count overflows sector rounding", load);
   }
 }
@@ -131,7 +130,7 @@ void load_synchronously(Core *core, const SynchronousLoad &request) {
   }
 
   const R3000 issuerRegisters = static_cast<R3000 &>(*core);
-  const uint32_t sectorCount = (load.requestBytes + kSectorPayloadBytes - 1u) / kSectorPayloadBytes;
+  const uint32_t sectorCount = (load.requestBytes + psx::cd::kDataSectorBytes - 1u) / psx::cd::kDataSectorBytes;
   if (load.requestLba > UINT32_MAX - (sectorCount - 1u)) {
     refuse(request.what, "retail request LBA range overflows", load);
   }
