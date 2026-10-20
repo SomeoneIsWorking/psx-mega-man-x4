@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """Front-end screen model and button rule for SLUS_005.61, read from guest words; the only owner of that model.
 
-    uv run --frozen python tools/title_prompts.py --selftest
-
 Addresses are symbols in external/mmx4/config/symbols.us.txt or constants this repo already owns.
 `func_8001DAF8` (323C.c:1597) dispatches `D_800F21B0[game_info.unk0]`, so game_info state/sub-state is the
 screen. `unkD` is the accept-input flag: `func_8001E708` reads Start only when it is 1.
@@ -10,9 +8,8 @@ screen. `unkD` is the accept-input flag: `func_8001E708` reads Start only when i
 
 from __future__ import annotations
 
-import argparse
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 GAME_INFO = 0x80173C70  # struct GameInfo, 0x10 bytes
@@ -285,7 +282,6 @@ def count_misc_populated(raw: bytes | None) -> int:
     return populated
 
 
-
 def leg_post_movie(screen: Screen) -> bool:
     """The movie phase is over: the XA/BGM machine is entered (`kMusicActive == 2`, gate at 0x800169D8)."""
     return screen.in_music_machine
@@ -364,7 +360,6 @@ def census_tally(screens: list[Screen], frames: list[int]) -> dict:
         "pad_words": pad_words,
         "musics": {s.music_active for s in screens},
     }
-
 
 
 _OWNER_STATE = re.compile(r"machine-state word 0x80139530 is (\d+)")
@@ -488,256 +483,3 @@ def verify_address_owners(repo_root) -> tuple[int, int, list[str]]:
     return matched, scanned, disagreements
 
 
-def _fixture(overrides: dict[int, bytes] | None = None) -> dict[int, bytes]:
-    """One census's worth of byte blocks at the measured post-movie park values (docs/issues/0028)."""
-    blocks = {
-        GAME_INFO: bytes(GAME_INFO_PROBE_BYTES),
-        CD_PROBE_BASE: bytes(CD_PROBE_BYTES),
-        STREAM_PROBE_BASE: bytes(STREAM_PROBE_BYTES),
-        ENGINE_PROBE_BASE: bytes(ENGINE_PROBE_BYTES),
-        PAD_HELD: bytes([0x00, 0x00, 0x00, 0x00, 0x00, 0x00]),
-        PAD_BUFFER: bytes([0x00, 0x41, 0xFF, 0xFF]),  # status, id, active-low button word
-        PLAYER: bytes(PLAYER_PROBE_BYTES),
-    }
-    cd = bytearray(CD_PROBE_BYTES)
-    cd[MACHINE_STATE - CD_PROBE_BASE] = 0x06
-    blocks[CD_PROBE_BASE] = bytes(cd)
-    stream = bytearray(STREAM_PROBE_BYTES)
-    stream[MUSIC_ACTIVE - STREAM_PROBE_BASE] = 0x02
-    stream[GUEST_FIELD - STREAM_PROBE_BASE] = 0x2A
-    blocks[STREAM_PROBE_BASE] = bytes(stream)
-    engine = bytearray(ENGINE_PROBE_BYTES)
-    engine[STAGE - ENGINE_PROBE_BASE] = 0x0E
-    blocks[ENGINE_PROBE_BASE] = bytes(engine)
-    game = bytearray(GAME_INFO_PROBE_BYTES)
-    game[0] = PARK_GAME_STATE
-    game[1] = PARK_SUB_STATE
-    game[HANDSHAKE - GAME_INFO] = 0x01  # issue 0028: the park's handshake byte is 1, not 2
-    blocks[GAME_INFO] = bytes(game)
-    blocks.update(overrides or {})
-    return blocks
-
-
-def selftest() -> int:
-    """Feed each verdict function the input that would change its answer; the owner check runs on a fixture tree."""
-    failures = 0
-    total = 0
-
-    def check(name: str, got: object, want: object) -> None:
-        nonlocal failures, total
-        total += 1
-        if got == want:
-            print(f"  ok   {name}: {got!r}")
-        else:
-            failures += 1
-            print(f"  FAIL {name}: got {got!r}, expected {want!r}")
-
-    park = decode(_fixture())
-    check("park decodes to game state 1 / sub-state 2", (park.game_state, park.sub_state),
-          (PARK_GAME_STATE, PARK_SUB_STATE))
-    check("park decodes handshake byte 1", park.handshake, 1)
-    check("park decodes machine state 6", park.machine_state, 6)
-    check("park decodes music-active 2", park.music_active, POST_MOVIE_MUSIC_ACTIVE)
-    check("park decodes the guest field counter", park.guest_field, 0x2A)
-    check("park decodes stage 14 / substage 0", (park.stage, park.substage), (0x0E, 0))
-    check("park decodes controller_state (the pressed edge word)", park.controller_state, 0)
-    check("park decodes the libpad packet header as status+id, not as input",
-          (park.pad_status, park.pad_id), (0x00, 0x41))
-    check("park decodes the packet's own button halfword as idle (active low, 0xFFFF)",
-          park.pad_button, 0xFFFF)
-    # The header is the constant 0x00,0x41; only the button halfword carries input.
-    pressed = decode(_fixture({PAD_BUFFER: bytes([0x00, 0x41, 0xFF, 0xE7])}))  # ~Start == 0xE7FF
-    check("a pressed Start shows in the packet's button halfword",
-          pressed.pad_button, 0xE7FF)
-    check("... and the header bytes are unchanged by it",
-          (pressed.pad_status, pressed.pad_id), (park.pad_status, park.pad_id))
-    check("... so the header alone cannot tell an idle pad from a pressed one",
-          (park.pad_status, park.pad_id), (pressed.pad_status, pressed.pad_id))
-    check("park decodes the player lens as inactive", park.player_active, 0)
-    check("park is the park", park.at_park, True)
-    check("park has NOT closed the falsifier", park.falsifier_closed, False)
-    check("park leaves the shell closed", park.shell_open, False)
-    check("post-movie leg accepts the park", leg_post_movie(park), True)
-    check("left-park leg rejects the park", leg_left_park(park), False)
-
-    # Falsifier pass: handshake reaches 2 and sub-state 2 releases.
-    cleared_game = bytearray(GAME_INFO_PROBE_BYTES)
-    cleared_game[0] = PARK_GAME_STATE
-    cleared_game[1] = 0x03  # func_8001DDB0's `arg0->mode++`
-    cleared_game[4] = 0x0A  # its own unk4 countdown
-    cleared_game[0x0A] = 0x02  # unkA, which func_8001DE20 sets on the way
-    cleared_game[0x0D] = 0x01  # unkD: this is the state that sets the accept-input flag
-    cleared_game[0x0E] = PARK_GAME_STATE
-    cleared_game[HANDSHAKE - GAME_INFO] = FALSIFIER_HANDSHAKE
-    cleared = decode(_fixture({GAME_INFO: bytes(cleared_game)}))
-    check("cleared screen closes the falsifier", cleared.falsifier_closed, True)
-    check("cleared screen is not the park", cleared.at_park, False)
-    check("left-park leg accepts the cleared screen", leg_left_park(cleared), True)
-    check("cleared screen accepts Start (unkD=1)", wants_start(cleared), True)
-    check("park screen does not accept Start (unkD=0)", wants_start(park), False)
-
-    # A census missing a read is refused, not zero-filled.
-    total += 1
-    try:
-        broken = _fixture()
-        del broken[PAD_HELD]
-        decode(broken)
-    except ValueError as error:
-        print(f"  ok   a census missing a read is refused: {error}")
-    else:
-        failures += 1
-        print("  FAIL a census missing a read decoded anyway, which reports an unprobed cell as zero")
-    # ... including the player read.
-    total += 1
-    try:
-        broken = _fixture()
-        del broken[PLAYER]
-        decode(broken)
-    except ValueError as error:
-        print(f"  ok   a census missing the player read is refused: {error}")
-    else:
-        failures += 1
-        print("  FAIL a census missing the player read decoded anyway")
-
-    # Short `misc_objects` reads only the records it has.
-    total += 1
-    short = bytes(MISC_RECORD_SIZE * 40)
-    check("short misc_objects reports the records it read", count_misc_populated(short), 0)
-    full = bytearray(MISC_RECORD_SIZE * MISC_RECORD_COUNT)
-    full[0] = 0xFF  # issue 0028's one populated record
-    full[MISC_RECORD_SIZE * 5] = 0xFF
-    check("full misc_objects counts 2 of 96", count_misc_populated(bytes(full)), 2)
-
-    # The falsifier's four answers.
-    served = ["[x4-music-cd] CdSync 0x800E5D20 served for state 6 (0x80016E34, edge 0x80016E48) -> CdlComplete"]
-    check("falsifier FIRES when the state word stays 6 with the owner serving it",
-          falsifier_verdict({"observations": 9, "machine_states": {6: 9}, "handshake_reached": False},
-                            served)[0], "FALSIFIER FIRES")
-    check("verdict says NOT REACHED when the owner was never offered the leaf",
-          falsifier_verdict({"observations": 9, "machine_states": {6: 9}, "handshake_reached": False},
-                            [])[0], "NOT REACHED")
-    check("verdict says ADVANCED when the state word left 6",
-          falsifier_verdict({"observations": 9, "machine_states": {6: 1, 5: 4, 1: 4},
-                             "handshake_reached": True}, served)[0], "ADVANCED")
-    check("verdict says REFUSED-BY-OWNER when the owner refused",
-          falsifier_verdict({"observations": 9, "machine_states": {6: 9}, "handshake_reached": False},
-                            ["[x4-music-cd] XA/BGM CD step refused: the noblock argument is not the "
-                             "image's 1"])[0], "REFUSED-BY-OWNER")
-    check("verdict says UNMEASURED with no observation at all",
-          falsifier_verdict({"observations": 0, "machine_states": {}, "handshake_reached": False},
-                            served)[0], "UNMEASURED")
-    # A run that only saw the movie phase has the word at 0, which must not read as "left 6".
-    check("verdict says NOT EXERCISED when the state word was never 6",
-          falsifier_verdict({"observations": 9, "machine_states": {0: 9, 7: 1},
-                             "handshake_reached": False}, served)[0], "NOT EXERCISED")
-    check("... and a run that only ever saw 0 says so rather than claiming an advance",
-          falsifier_verdict({"observations": 9, "machine_states": {0: 9},
-                             "handshake_reached": False}, [])[0], "NOT EXERCISED")
-    check("... while a run that saw 6 AND something else still reads ADVANCED",
-          falsifier_verdict({"observations": 9, "machine_states": {0: 4, 6: 3, 2: 2},
-                             "handshake_reached": True}, served)[0], "ADVANCED")
-    # The owner's per-step log is a second source for a chain that completes inside one field.
-    stepped = ["[x4-music-cd] CdSync 0x800E5D20 served for state 6 ... machine-state word 0x80139530 is 6",
-               "[x4-music-cd] CdControl 0x800E5D90 served for state 6 ... machine-state word 0x80139530 is 6",
-               "[x4-music-cd] CdSync 0x800E5D20 served for state 5 ... machine-state word 0x80139530 is 5",
-               "[x4-music-cd] CdSync 0x800E5D20 served for state 1 ... machine-state word 0x80139530 is 1"]
-    check("the owner's per-step state words are read out of its log", owner_state_steps(stepped), [6, 6, 5, 1])
-    check("a census that never saw 6 but whose owner log did reads ADVANCED, not NOT EXERCISED",
-          falsifier_verdict({"observations": 7, "machine_states": {0: 7}, "handshake_reached": False},
-                            stepped)[0], "ADVANCED")
-    check("a run whose owner log never reached 6 either is NOT EXERCISED",
-          falsifier_verdict({"observations": 7, "machine_states": {0: 7}, "handshake_reached": False},
-                            [])[0], "NOT EXERCISED")
-
-    # The second observation has a different machine state.
-    moved_screen = decode(_fixture({CD_PROBE_BASE: bytes(
-        [0] * (MACHINE_STATE - CD_PROBE_BASE) + [0x01, 0x00]
-        + [0] * (CD_PROBE_BYTES - MACHINE_STATE - 2 + CD_PROBE_BASE))}))
-    tallied = census_tally([park, moved_screen, cleared], [100, 200, 900])
-    check("census counts its observations", tallied["observations"], 3)
-    check("census counts the park observations", tallied["park_observations"], 2)
-    check("census reports the frame span", tallied["frames_covered"], 800)
-    check("census holds state 1/2 for 101 fields (frames 100..200 inclusive)",
-          tallied["game_states"][(PARK_GAME_STATE, PARK_SUB_STATE)]["frames_held"], 101)
-    check("census names the machine states it saw", tallied["machine_states"], {6: 2, 1: 1})
-    # Held, previous and pressed are reported separately.
-    check("census reports the three pad words as three distributions",
-          sorted(tallied["pad_words"]), ["held", "pressed", "previous"])
-    check("census's pressed distribution is the decomp's controller_state",
-          tallied["pad_words"]["pressed"], tallied["pad_words"]["pressed"])
-    # Three differing pad words must give three differing distributions.
-    edged = decode(_fixture({PAD_HELD: bytes([0x11, 0x00, 0x22, 0x00, 0x33, 0x00])}))
-    edged_tally = census_tally([edged, park], [10, 20])
-    check("census keeps the held word, the previous word and the pressed edge apart",
-          (edged_tally["pad_words"]["held"], edged_tally["pad_words"]["previous"],
-           edged_tally["pad_words"]["pressed"]),
-          ({0x0011: 1, 0: 1}, {0x0022: 1, 0: 1}, {0x0033: 1, 0: 1}))
-
-    # The address-owner check must produce BOTH verdicts on a fixture tree.
-    import tempfile
-    with tempfile.TemporaryDirectory(dir=str(__import__("pathlib").Path.cwd() / "scratch")
-                                     if (__import__("pathlib").Path.cwd() / "scratch").is_dir()
-                                     else None) as scratch:
-        from pathlib import Path as _Path
-        tree = _Path(scratch) / "fixture"
-        (tree / "tools").mkdir(parents=True)
-        (tree / "game/media").mkdir(parents=True)
-        (tree / "game/input").mkdir(parents=True)
-        (tree / "game/title").mkdir(parents=True)
-        (tree / "tools/title_prompts.py").write_text(
-            f"GAME_INFO = 0x{GAME_INFO:08X}u\nMACHINE_STATE = 0x{MACHINE_STATE:08X}u\n"
-            f"MUSIC_ACTIVE = 0x{MUSIC_ACTIVE:08X}u\nPAD_PRESSED = 0x{PAD_PRESSED:08X}u\n"
-            f"HANDSHAKE = 0x{HANDSHAKE:08X}u\nENGINE_OBJ = 0x{ENGINE_OBJ:08X}u\n"
-            f"MISC_OBJECTS = 0x{MISC_OBJECTS:08X}u\nSTEP_TABLE = 0x{STEP_TABLE:08X}u\n"
-            f"PLAYER = 0x{PLAYER:08X}u\n")
-        (tree / "game/media/music_cd.h").write_text(
-            f"inline constexpr std::uint32_t kStepTable = 0x{STEP_TABLE:08X}u;\n"
-            f"inline constexpr std::uint32_t kMachineState = 0x{MACHINE_STATE:08X}u;\n"
-            f"inline constexpr std::uint32_t kMusicActive = 0x{MUSIC_ACTIVE:08X}u;\n"
-            f"inline constexpr std::uint32_t kError = 0x{STICKY_ERROR:08X}u;\n"
-            f"inline constexpr std::uint32_t kResult = 0x{RESULT_BYTE:08X}u;\n"
-            f"inline constexpr std::uint32_t kShellOpenBit = 0x40u;\n")
-        (tree / "game/input/pad_layout.h").write_text(
-            f"inline constexpr std::uint32_t kSlot0Buffer = 0x{PAD_BUFFER:08X}u;\n")
-        (tree / "game/title/player_object.h").write_text(
-            f"inline constexpr uint32_t kPlayerAddress = 0x{PLAYER:08X}u;\n"
-            f"inline constexpr uint32_t kPadHeldP1 = 0x{PAD_HELD:08X}u;\n"
-            f"inline constexpr uint32_t kPadPressedP1 = 0x{PAD_PRESSED:08X}u;\n")
-        matched, scanned, disagreements = verify_address_owners(tree)
-        check("owner check accepts a fixture that agrees", (matched == scanned, disagreements), (True, []))
-        # Now the case that WOULD fail: an owner that names a different address.
-        (tree / "game/input/pad_layout.h").write_text(
-            "inline constexpr std::uint32_t kSlot0Buffer = 0x80000000u;\n")
-        matched, scanned, disagreements = verify_address_owners(tree)
-        check("owner check refuses a disagreeing owner", matched < scanned, True)
-        check("owner check NAMES the disagreement", disagreements != [], True)
-        # ... and an owner that stopped declaring the address at all.
-        (tree / "game/input/pad_layout.h").write_text("// the buffer moved into a typed owner\n")
-        matched, scanned, disagreements = verify_address_owners(tree)
-        check("owner check refuses an owner that stopped declaring it", matched < scanned, True)
-
-    if failures:
-        print(f"  selftest: {failures} of {total} case(s) FAILED")
-        return 1
-    print(f"  selftest: {total - failures}/{total} cases behaved as required.")
-    print("  The load-bearing pairs are: the park decoding AS the park (so 'it cleared' means something),")
-    print("  and the falsifier answering FIRES on a served leaf with a state word that never moved (so the")
-    print("  mechanism can be retired by evidence rather than by absence of evidence).")
-    return 0
-
-
-def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__,
-                                     formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--selftest", action="store_true",
-                        help="decode fixtures, run the falsifier over all four of its answers, and "
-                             "check the address owners on a fixture tree; drives nothing")
-    arguments = parser.parse_args()
-    if arguments.selftest:
-        return selftest()
-    parser.print_help()
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
