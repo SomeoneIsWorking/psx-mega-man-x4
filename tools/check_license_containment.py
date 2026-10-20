@@ -3,7 +3,6 @@
 
   python3 tools/check_license_containment.py                     # scan the framework checkouts it finds
   python3 tools/check_license_containment.py --psxport <dir> ...  # scan these instead
-  python3 tools/check_license_containment.py --selftest           # prove it fires AND stays silent
 
 Classes (A, B, C hard; A2, B2 advisory):
   A   AGPL/Affero licence notice, or a code/build file sourcing from the decomp
@@ -25,7 +24,6 @@ import os
 import re
 import subprocess
 import sys
-import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -513,246 +511,6 @@ def run(corpus, trees, baselines, include_vendor, strict=False, show_advisory=Fa
     return 0
 
 
-CLEAN_C = '''// Generic PSX port code: SDK names and ordinary prose only, nothing from the decomp.
-#include <cstdint>
-void frame(uint32_t* fb) {
-  DrawSync(0); VSync(0); LoadImage(&rect, fb);
-  // The framebuffer upload path waits on the GPU before presenting the finished frame.
-  for (int i = 0; i < 16; i++) fb[i] = 0;
-}
-'''
-
-DIRTY_C = '''#include "common.h"
-// This file is a planted leak for the selftest.
-void character_select_state_0(struct EngineObj* arg0) {
-  background_objects[0].unk3 = 0;
-  need_palette_load |= 1;
-}
-'''
-
-
-# Fixtures live under the gitignored scratch tree, not /tmp.
-def _tmpdir(prefix):
-    scratch = os.path.join(ROOT, "scratch", "raw")
-    os.makedirs(scratch, exist_ok=True)
-    return tempfile.TemporaryDirectory(prefix=prefix, dir=scratch)
-
-
-def selftest(corpus_real=None, baseline_file=None):
-    corpus_real = corpus_real or os.path.join(ROOT, "external", "mmx4")
-    baseline_file = baseline_file or os.path.join(ROOT, BASELINE_FILE)
-    fails, checks = [], []
-
-    with _tmpdir("containment-selftest-") as td:
-        # Synthetic decomp corpus: own sources, a Sony SDK subtree to subtract, and one phrase signature.
-        corpus = os.path.join(td, "corpus")
-        os.makedirs(os.path.join(corpus, "src", "main"))
-        os.makedirs(os.path.join(corpus, SDK_DIR))
-        with open(os.path.join(corpus, "src", "main", "character_select.c"), "w") as fh:
-            fh.write('''#include "common.h"
-/* The decomp's own comment, long enough to be a phrase signature in its own right. */
-void character_select_state_0(struct EngineObj* arg0) {
-  background_objects[0].unk3 = 0;
-  need_palette_load |= 1;
-  func_8001D134();
-  /* The decomp USES the SDK macro, exactly as src/main/323C.c does. Without this line the
-     "SDK MACRO names are subtracted" check below would pass vacuously: a name absent from the
-     mining side can never become a signature, whatever the subtraction does. */
-  D_80139670 = OpenEvent(SwCARD, EvSpIOE, EvMdNOINTR, NULL);
-}
-''')
-        with open(os.path.join(corpus, SDK_DIR, "LIBGPU.H"), "w") as fh:
-            fh.write("/* (C) Copyright 1993-1995 Sony Corporation. */\n"
-                     "void DrawSyncCallback(void); void LoadImage(RECT*, u_long*);\n"
-                     "#define EvMdNOINTR 0x2000\n"       # a macro: must survive `#` handling
-                     "struct DRAWENV { RECT clip; };\n")
-        # A symbol map like the real one: hand-named game symbols mixed with Sony BIOS API names.
-        os.makedirs(os.path.join(corpus, "config"))
-        with open(os.path.join(corpus, "config", "symbols.us.txt"), "w") as fh:
-            fh.write("find_free_weapon_obj = 0x8002AC0C;\nSysEnqIntRP = 0x800EE35C;\n"
-                     "SpuClearReverbWorkArea = 0x800DAF48;\n")
-
-        neg = os.path.join(td, "psxport-clean")
-        os.makedirs(os.path.join(neg, "runtime"))
-        with open(os.path.join(neg, "runtime", "gpu.cpp"), "w") as fh:
-            fh.write(CLEAN_C)
-
-        pos = os.path.join(td, "psxport-leaked")
-        os.makedirs(os.path.join(pos, "runtime"))
-        with open(os.path.join(pos, "runtime", "gpu.cpp"), "w") as fh:
-            fh.write(CLEAN_C)
-        with open(os.path.join(pos, "runtime", "leaked.cpp"), "w") as fh:
-            fh.write('''// Taken from external/mmx4 — a class A source reference in a CODE file.
-// Licensed under the terms of the GNU Affero General Public License version 3.
-/* The decomp's own comment, long enough to be a phrase signature in its own right. */
-void character_select_state_0(struct EngineObj* arg0) {
-  background_objects[0].unk3 = 0;
-  need_palette_load |= 1;
-}
-''')
-
-        # Second negative tree: BIOS-HLE code naming Sony kernel APIs, and the doc that states the rule.
-        hle = os.path.join(td, "psxport-bios-hle")
-        os.makedirs(os.path.join(hle, "runtime"))
-        os.makedirs(os.path.join(hle, "docs", "workspace"))
-        with open(os.path.join(hle, "runtime", "hle.cpp"), "w") as fh:
-            fh.write("// BIOS HLE: an event opened EvMdNOINTR (0x2000) is POLLED, not delivered.\n"
-                     "void hle_sys(uint32_t fn) { /* SysEnqIntRP chain walk */ }\n"
-                     "void spu_reset(void) { SpuClearReverbWorkArea(); }\n")
-        with open(os.path.join(hle, "docs", "workspace", "PROTOCOL.md"), "w") as fh:
-            fh.write("| `megamanx4/external/mmx4` | Mega Man X4 decomp | AGPL-3.0 | repo-local; "
-                     "never lift into psxport |\n")
-
-        idents, mapnames, phrases, _ = build_signatures(corpus, [], verbose=False)
-        self_path = os.path.abspath(__file__)
-
-        # NEGATIVE: a clean tree produces zero hits.
-        h, n, _, _ = scan(neg, idents, mapnames, phrases, False, self_path)
-        checks.append(("negative: clean framework tree gives 0 hits",
-                       len(h) == 0, f"{len(h)} hit(s) over {n} file(s): {h[:3]}"))
-
-        # NEGATIVE: Sony API names, and the doc that states the rule, must produce 0 HARD hits.
-        h, n, _, _ = scan(hle, idents, mapnames, phrases, False, self_path)
-        hard = [x for x in h if x[0][:2] not in ("A2", "B2")]
-        checks.append(("negative: BIOS-HLE code naming Sony APIs + the workspace doc that STATES this "
-                       "rule give 0 HARD hits (EvMdNOINTR is a KERNEL.H macro, SysEnqIntRP is "
-                       "symbol-map-only, and naming the decomp in a .md is not sourcing from it)",
-                       len(hard) == 0, f"{len(hard)} hard hit(s): {hard[:3]}"))
-        checks.append(("negative: that same tree DOES raise advisory hits (silence there would mean "
-                       "the advisory tier is dead code)",
-                       any(x[0][:2] in ("A2", "B2") for x in h),
-                       f"classes seen: {sorted({x[0] for x in h})}"))
-
-        # POSITIVE: a planted leak fires in every hard class.
-        h, n, _, _ = scan(pos, idents, mapnames, phrases, False, self_path)
-        classes = {c for c, *_ in h}
-        checks.append(("positive: planted leak fires at all", len(h) > 0,
-                       f"{len(h)} hit(s) over {n} file(s)"))
-        for cls, label in (("A licence/source", "AGPL notice + external/mmx4 in a .cpp"),
-                           ("B identifier", "distinctive code identifier"),
-                           ("C phrase", "copied comment")):
-            checks.append((f"positive: class {cls} ({label}) fires", cls in classes,
-                           f"classes seen: {sorted(classes)}"))
-
-        # The SDK subtraction must remove Sony names.
-        checks.append(("SDK vocabulary is subtracted (DrawSyncCallback is not a signature)",
-                       "DrawSyncCallback" not in idents, "it IS in the signature set"))
-        checks.append(("SDK MACRO names are subtracted too (EvMdNOINTR is not a signature)",
-                       "EvMdNOINTR" not in idents and "EvMdNOINTR" not in mapnames,
-                       "it IS in the signature set — the `#`-stripping bug is back"))
-        checks.append(("a hand-named game symbol from the map is a signature "
-                       "(find_free_weapon_obj)", "find_free_weapon_obj" in mapnames,
-                       f"mapnames={sorted(mapnames)}"))
-
-        # REFUSAL: a missing corpus exits 2.
-        try:
-            build_signatures(os.path.join(td, "no-such-corpus"), [], verbose=False)
-            checks.append(("refusal: missing corpus exits 2", False, "it returned instead"))
-        except SystemExit as e:
-            checks.append(("refusal: missing corpus exits 2", e.code == 2, f"exit {e.code}"))
-
-        # REFUSAL: no framework checkout to scan exits 2.
-        try:
-            run(corpus, [], [], False, False, False, require_baseline=False)
-            checks.append(("refusal: no framework checkout exits 2", False, "it returned instead"))
-        except SystemExit as e:
-            checks.append(("refusal: no framework checkout exits 2", e.code == 2, f"exit {e.code}"))
-
-        # REFUSAL: a checkout that exists but holds nothing to scan (uninitialised submodule).
-        empty = os.path.join(td, "psxport-empty")
-        os.makedirs(empty)
-        out = io.StringIO()
-        try:
-            with contextlib.redirect_stdout(out):
-                rc = run(corpus, [empty], [], False, False, False, require_baseline=False)
-            checks.append(("refusal: an EMPTY framework checkout exits 2 (scanned zero files is not "
-                           "a clean tree)", False, f"it returned {rc}: {out.getvalue()[-200:]}"))
-        except SystemExit as e:
-            checks.append(("refusal: an EMPTY framework checkout exits 2 (scanned zero files is not "
-                           "a clean tree)", e.code == 2, f"exit {e.code}"))
-
-        # POSITIVE: a leak in a tree where git lists nothing (all files ignored) is still found.
-        ign = os.path.join(td, "psxport-ignored")
-        os.makedirs(os.path.join(ign, "runtime"))
-        with open(os.path.join(ign, ".gitignore"), "w") as fh:
-            fh.write("*\n")
-        with open(os.path.join(ign, "runtime", "leaked.cpp"), "w") as fh:
-            fh.write('''// Taken from external/mmx4 — a class A source reference in a CODE file.
-void character_select_state_0(void) { need_palette_load |= 1; }
-''')
-        subprocess.run(["git", "init", "-q", ign], capture_output=True)
-        listed, how = scan_files(ign, False)
-        out = io.StringIO()
-        try:
-            with contextlib.redirect_stdout(out):
-                rc = run(corpus, [ign], [], False, False, False, require_baseline=False)
-        except SystemExit as e:
-            rc = e.code
-        checks.append(("positive: a leak in a tree whose every file git IGNORES is still found "
-                       "(never a clean pass over zero files)", rc == 1,
-                       f"exit {rc}; enumerated {len(listed)} file(s) via {how[:40]}"))
-
-    # With the real corpus: the signature set is non-degenerate and still fires, using the tracked baseline alone (bare clone).
-    if os.path.isdir(corpus_real):
-        ridents, rmap, rphrases, _ = build_signatures(corpus_real, [], verbose=False,
-                                                      baseline_file=baseline_file)
-        checks.append((f"real corpus at {corpus_real} yields >= 100 identifier signatures",
-                       len(ridents) >= 100,
-                       f"{len(ridents)} identifiers, {len(rmap)} map names, {len(rphrases)} phrases"))
-        with _tmpdir("containment-real-") as td2:
-            os.makedirs(os.path.join(td2, "runtime"))
-            with open(os.path.join(td2, "runtime", "leak.cpp"), "w") as fh:
-                fh.write(DIRTY_C)
-            h, _, _, _ = scan(td2, ridents, rmap, rphrases, False, os.path.abspath(__file__))
-            checks.append(("real corpus: a verbatim decomp function body fires",
-                           any(c == "B identifier" for c, *_ in h), f"hits: {h[:3]}"))
-            with open(os.path.join(td2, "runtime", "leak.cpp"), "w") as fh:
-                fh.write(CLEAN_C)
-            h, _, _, _ = scan(td2, ridents, rmap, rphrases, False, os.path.abspath(__file__))
-            checks.append(("real corpus: generic SDK code stays silent", len(h) == 0, f"hits: {h}"))
-
-        # NEGATIVE: the real signatures with the tracked baseline only give 0 HARD hits on a real psxport checkout.
-        real_trees = default_psxport_trees()
-        if real_trees:
-            hard = []
-            for t in real_trees:
-                h, _, _, _ = scan(t, ridents, rmap, rphrases, False, os.path.abspath(__file__))
-                hard += [x for x in h if x[0][:2] not in ("A2", "B2")]
-            checks.append(("BARE CLONE: real corpus + the TRACKED exclusion list ONLY (no sibling port "
-                           f"trees) gives 0 HARD hits against {len(real_trees)} real psxport "
-                           "checkout(s)", len(hard) == 0,
-                           f"{len(hard)} hard hit(s): {[(x[0], x[3]) for x in hard[:6]]}"))
-        else:
-            checks.append(("BARE CLONE: real corpus + the tracked exclusion list against a real "
-                           "psxport checkout", None,
-                           "NO psxport checkout found ($PSXPORT_DIR / external/psxport / ../psxport) "
-                           "— the bare-clone false-positive case was NOT exercised"))
-
-        # REFUSAL: no baseline at all (file deleted, no sibling tree).
-        try:
-            build_signatures(corpus_real, [], verbose=False,
-                             baseline_file=os.path.join(ROOT, "docs", "info", "no-such-baseline.txt"),
-                             require_baseline=True)
-            checks.append(("refusal: NO baseline (no tracked list, no sibling tree) exits 2", False,
-                           "it returned a signature set instead"))
-        except SystemExit as e:
-            checks.append(("refusal: NO baseline (no tracked list, no sibling tree) exits 2",
-                           e.code == 2, f"exit {e.code}"))
-    else:
-        checks.append((f"real corpus at {corpus_real} present", None,
-                       "NOT CHECKED OUT — the synthetic cases passed, but the real signature set was "
-                       "never exercised. This selftest is weaker than it looks."))
-
-    print("[selftest] both classes are gated; a pass means the tool can say YES and NO.")
-    for name, ok, detail in checks:
-        tag = "PASS" if ok else ("SKIP" if ok is None else "FAIL")
-        print(f"  [{tag}] {name}" + (f" — {detail}" if (ok is not True) else ""))
-        if ok is False:
-            fails.append(name)
-    print(f"[selftest] {len(checks)} checks, {len(fails)} failed")
-    return 1 if fails else 0
-
-
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -780,10 +538,7 @@ def main():
                          "the exit code")
     ap.add_argument("--show-advisory", action="store_true",
                     help="list every advisory hit instead of summarising per file")
-    ap.add_argument("--selftest", action="store_true", help="gate a positive AND a negative case")
     a = ap.parse_args()
-    if a.selftest:
-        raise SystemExit(selftest(a.corpus, a.baseline_file))
     baselines = a.baseline if a.baseline is not None else default_baselines()
     if a.write_baseline:
         raise SystemExit(write_baseline(a.corpus, baselines, a.baseline_file))

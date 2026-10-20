@@ -293,7 +293,6 @@ def run_launcher(
             "-B",
             PLAYER_BUILD_DIR,
             "-DCMAKE_BUILD_TYPE=Release",
-            "-DBUILD_TESTING=OFF",
             f"-DPSXPORT_DIR={psxport_path.absolute()}",
             f"-DPython3_EXECUTABLE={python_executable}",
             *compiler_options,

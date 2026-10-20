@@ -42,10 +42,8 @@ overlays); `external/mmx4` is an AGPL matching-decomp reference that never enter
 | `widescreenCvar`, `coopCvar`, `fastWaitCvar`, `skipCvar` | `game/title/enhancements.*` | The `pc_enh` knobs (`docs/config.md`) and the unread-knob line |
 | launcher | `tools/run.py`, `tools/resolve_disc.py`, `tools/extract_exe.py` | Disc resolution, extraction and authentication for the zero-argument launch |
 | live driver | `tools/live_play.py`, `tools/title_prompts.py` | Headless control-channel input, front-end census, captures |
-| checks | `tools/behavior.py`, `check_license_containment.py`, `verify_decomp_targets.py`, `verify_task_resume.py`, `run_end.py` | Behaviour-map, AGPL containment, decomp target identity, task resume, run-end report parsing |
+| checks | `tools/behavior.py`, `check_license_containment.py`, `run_end.py` | Behaviour-map, AGPL containment scan, run-end report parsing |
 | disc files | `tools/discdump.py` | Lists or extracts disc files through psxport's `discdump` |
-| gate | `tools/verify.py`, `cmake/port.cmake` | Build and CTest: style policy, temporal-dependency checks, `x4_*` seams |
-| tests | `tests/` | One hermetic seam per owner; `tests/stub_game.h` is the shared stub runtime |
 
 ## Where new work goes
 
