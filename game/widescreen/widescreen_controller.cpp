@@ -15,21 +15,21 @@ namespace x4 {
 namespace {
 
 // The single SetGeomOffset/SetGeomScreen publication: 320x240, H=512.
-constexpr GuestProjectionGeometry kRetailProjection{{320, 240}, 320};
+constexpr psx::present::GuestProjectionGeometry kRetailProjection{{320, 240}, 320};
 constexpr uint32_t kDrawEnvironmentWidthOffset = 4u;
 
 } // namespace
 
-PresentationAspect WidescreenPolicy::presentationAspect(const Core &core) const {
+psx::present::PresentationAspect WidescreenPolicy::presentationAspect(const Core &core) const {
   // STR movies are 320x240 pictures without the widened GTE projection, so they stay 4:3 while streaming.
   if (session(core).movieCleanup.ownsPicture()) {
-    return PresentationAspect::Standard4x3;
+    return psx::present::PresentationAspect::Standard4x3;
   }
   if (!psx::config::enh(widescreenCvar())) {
-    return PresentationAspect::Standard4x3;
+    return psx::present::PresentationAspect::Standard4x3;
   }
   // The player's Aspect Ratio row (Mods::aspect) picks the widening.
-  return GuestWidescreenProjection::presentationAspect(core);
+  return psx::present::GuestWidescreenProjection::presentationAspect(core);
 }
 
 WidescreenController::WidescreenController() : WidescreenController(psx::present::latchGuestProjection) {}

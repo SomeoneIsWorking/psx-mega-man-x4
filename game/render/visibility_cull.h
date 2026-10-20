@@ -93,7 +93,7 @@ struct ScreenCoordinate {
 // Recovers an object screen position, decides the cull and publishes the flag.
 class VisibilityCull {
 public:
-  explicit VisibilityCull(const GuestProjectionPlan &plan) : margin_(plan.presentationHorizontalMargin) {}
+  explicit VisibilityCull(const psx::present::GuestProjectionPlan &plan) : margin_(plan.presentationHorizontalMargin) {}
   // The retail box: what gameplay reads.
   static VisibilityCull retail() {
     return VisibilityCull{0};

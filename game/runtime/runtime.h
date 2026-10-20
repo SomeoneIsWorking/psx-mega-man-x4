@@ -20,7 +20,7 @@ public:
   std::unique_ptr<psx::game::TitleSessionState> createSession(Game &game) override;
   std::unique_ptr<psx::game::FrameDriver> createFrameDriver(Game &game) override;
   void deliverPad(Core &core, const psx::input::PadDelivery &delivery) override;
-  const GuestWidescreenProjection *guestWidescreenProjection() const override;
+  const psx::present::GuestWidescreenProjection *guestWidescreenProjection() const override;
   bool titleCommand(Core &core, const psx::game::TitleCommandLine &input, std::FILE *reply) override;
   psx::game::TitleDevWarp *devWarp(Core &core) const override;
   void reportRun(Core &core) const override;
