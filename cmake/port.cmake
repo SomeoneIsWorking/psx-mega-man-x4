@@ -65,7 +65,7 @@ psxport_add_product(
   SOURCES game/runtime/catalog.cpp ${SEAM_SRC}
 )
 
-# gpu_vk.cpp in libpsxport needs the generated SDL_GPU shader header first.
+# libpsxport's render sources include the generated shader header.
 add_dependencies(megamanx4_port gen_gpu_shaders)
 
 set_target_properties(megamanx4_port PROPERTIES

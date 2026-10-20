@@ -69,7 +69,7 @@ MarginColumns marginColumns(int scrollX, int marginPixels);
 
 class WideBackground {
 public:
-  explicit WideBackground(const GuestProjectionPlan &plan) : margin_(plan.presentationHorizontalMargin) {}
+  explicit WideBackground(const psx::present::GuestProjectionPlan &plan) : margin_(plan.presentationHorizontalMargin) {}
 
   int margin() const {
     return margin_ > 0 ? margin_ : 0;
