@@ -62,7 +62,7 @@ void censusIrqTable(Core *c, uint32_t field) {
       continue;
     }
     ++populated;
-    const bool executable = c->currentImageIdentity(handler).has_value();
+    const bool executable = c->imageCatalog().resolve(handler).has_value();
     if (!executable) {
       ++outside;
       // A non-code handler word never becomes code, so report it at once with its class.
@@ -136,7 +136,6 @@ void deliverField(Core &core) {
   c->game->spu_audio.frame();
 
   // The neutral presenter owns capture and pacing; pass the one-field-per-step cadence explicitly.
-  c->game->snapshots.tick(*c);
   c->game->presentation.commit(c, 1);
   lucent::debug("x4-vsync", "native field {} -> {}", before, after);
 }

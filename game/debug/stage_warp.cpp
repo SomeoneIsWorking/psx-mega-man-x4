@@ -3,7 +3,6 @@
 #include "core.h"
 
 #include <lucent/log.h>
-#include <sstream>
 
 namespace x4 {
 
@@ -15,18 +14,14 @@ bool StageWarp::stageRunning(Core &core) {
   return core.mem_r8(kEngine + kStateOffset) == kInStage && core.mem_r8(kEngine + kSubStateOffset) == kPlaying;
 }
 
-std::string StageWarp::arm(const char *line) {
-  std::istringstream words(line);
-  std::string command;
-  std::uint32_t stage = 0;
-  std::uint32_t part = 0;
-  words >> command >> stage;
-  if (!words) {
+std::string StageWarp::arm(const psx::debug::CommandArgs &args) {
+  const std::optional<std::uint32_t> stageWord = args.number(1);
+  const std::optional<std::uint32_t> partWord = args.size() < 3 ? 0u : args.number(2);
+  if (!stageWord || !partWord) {
     return "usage: warp <stage> [part]";
   }
-  if (!(words >> part)) {
-    part = 0;
-  }
+  const std::uint32_t stage = *stageWord;
+  const std::uint32_t part = *partWord;
   if (stage >= kStageNames.size()) {
     return lucent::format("refused: stage {} is out of range (0..{})", stage, kStageNames.size() - 1);
   }

@@ -16,7 +16,7 @@ namespace {
 constexpr std::uint32_t kNumGpr = 32u; // R3000::r; r[0] is hardwired zero
 
 void requireOwnedEntry(Core *core, std::uint32_t address, const char *owner) {
-  if (core->currentImageIdentity(address)) {
+  if (core->imageCatalog().resolve(address)) {
     return;
   }
   lucent::error("x4-guest",
@@ -42,8 +42,8 @@ void callWithoutKnownReturn(Core *core, std::uint32_t address) {
   }
   // A BudgetExhausted first segment would need a boundary this form lacks, so it refuses.
   requireOwnedEntry(core, address, "x4::guest::callWithoutKnownReturn");
-  const psx::cpu::ExecutionResult first =
-      psx::cpu::dispatchGuest(*core, address, psx::cpu::ExecutionBudget::currentTurn(*core));
+  const psx::cpu::ExecutionResult first = psx::cpu::dispatchGuest(
+      *core, address, psx::cpu::ExecutionBudget::currentTurn(*core), "x4::guest::callWithoutKnownReturn");
   if (first.reason != psx::cpu::ExecutionExitReason::BudgetExhausted) {
     if (first.returned()) {
       core->guestCallCensus().recordCompleted(address, first.guestPc, 1u, first.cycles);
@@ -121,7 +121,7 @@ void callWithRegisterReturn(Core *core, std::uint32_t address) {
   }
   requireOwnedEntry(core, address, "x4::guest::callWithRegisterReturn");
   const std::uint32_t returnPc = core->r[31];
-  if (!core->currentImageIdentity(returnPc)) {
+  if (!core->imageCatalog().resolve(returnPc)) {
     lucent::error("x4-guest",
                   "guest call 0x{:08X} is dispatching through a link register of 0x{:08X}, which is "
                   "not in any code image. Either this owner did not set `r[31]` to the return "
@@ -134,7 +134,7 @@ void callWithRegisterReturn(Core *core, std::uint32_t address) {
 }
 
 psx::cpu::ExecutionResult dispatch(Core &core, std::uint32_t address) {
-  return psx::cpu::dispatchGuest(core, address, psx::cpu::ExecutionBudget::currentTurn(core));
+  return psx::cpu::dispatchGuest(core, address, psx::cpu::ExecutionBudget::currentTurn(core), "x4::guest::dispatch");
 }
 
 } // namespace x4::guest
