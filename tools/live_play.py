@@ -1196,7 +1196,7 @@ def report(session: Session, client: LiveClient, log: Path) -> int:
         if line.strip().startswith("[cfg] active:") or line.strip().startswith("[cfg]   PSXPORT_"):
             print(f"[live]   {line.strip()}")
     for name in ("PSXPORT_SETTINGS", "PSXPORT_DEBUG_SERVER", "PSXPORT_X4_WIDESCREEN", "PSXPORT_NOAUDIO",
-                 "PSXPORT_NOPACE", "PSXPORT_VK_HEADLESS", "PSXPORT_RENDER_PATH", "PSXPORT_WATCHDOG",
+                 "PSXPORT_NOPACE", "PSXPORT_SHOW_WINDOW", "PSXPORT_RENDER_PATH", "PSXPORT_WATCHDOG",
                  "PSXPORT_PRESENT_SINK", "PSXPORT_WAV", "PSXPORT_NATIVE_FRAMES", "PSXPORT_REPL"):
         if name in configuration["knobs"]:
             print(f"[live]   {name} = {configuration['knobs'][name]} [{configuration['layers'][name]}]")
