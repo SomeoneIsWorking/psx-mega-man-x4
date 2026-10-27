@@ -47,7 +47,8 @@ uint32_t g_retraceGateHits = 0u;
 } // namespace
 
 // Scan every IRQ class slot on a stride, not only the delivered one, and report non-code handler words.
-constexpr uint32_t kIrqClassCount = 16u;
+// The dispatcher 0x800E5208 walks classes 0..10; the word after them, 0x8011CBC4, is the enabled mask.
+constexpr uint32_t kIrqClassCount = 11u;
 constexpr uint32_t kIrqCensusStride = 64u;
 
 void censusIrqTable(Core *c, uint32_t field) {
