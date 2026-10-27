@@ -25,7 +25,7 @@ a human action at a live console after launch, later and more specific than the 
 | knob | kind | default | persistable | C++ object | read path |
 |---|---|---|---|---|---|
 | `PSXPORT_X4_DISC` | path (port fact, not a CVar) | — | — | `kTitleIdentity.discEnvVar` (`game/runtime/catalog.cpp`) | `tools/resolve_disc.py` host-side; the framework's disc resolver guest-side |
-| `PSXPORT_X4_CARD` | path (port fact, not a CVar) | `scratch/saves/megamanx4.mcr` | — | `x4::Runtime::hostIdentity()` (`game/runtime/runtime.cpp`) | the framework's memory-card backend |
+| `PSXPORT_CARD` | path (port fact, not a CVar) | `scratch/saves/megamanx4.mcr` | — | `x4::Runtime::hostIdentity()` (`game/runtime/runtime.cpp`) | the framework's memory-card backend |
 | `PSXPORT_X4_WIDESCREEN` | Bool | `true` | yes | `x4::widescreenCvar()` | `psx::config::enh(widescreenCvar())` in game/widescreen/widescreen_controller.cpp |
 | `PSXPORT_X4_COOP` | Bool | `false` | yes | `x4::coopCvar()` | no reader yet; `x4::reportUnreadEnhancements()` says so each run |
 | `PSXPORT_X4_SKIP` | Bool | `true` | yes | `x4::skipCvar()` | `psx::config::enh(skipCvar())` in game/input/sequence_skip_overrides.cpp (Start skips the Hunter H.Q. briefing) |

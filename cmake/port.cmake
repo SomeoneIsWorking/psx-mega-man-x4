@@ -46,6 +46,7 @@ set(SEAM_SRC
   game/execution/guest_execution.cpp
   game/execution/native_overrides.cpp
   game/execution/bios_threads.cpp
+  game/debug/debug_menu.cpp
   game/debug/stage_warp.cpp
   game/title/enhancements.cpp
 )

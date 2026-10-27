@@ -26,11 +26,9 @@
 #include "core.h"
 #include "game.h"
 
-#include <cstdio>
 #include <lucent/log.h>
 #include <memory>
 #include <string>
-#include <string_view>
 
 namespace x4 {
 namespace {
@@ -38,7 +36,6 @@ namespace {
 constexpr psx::game::Crt0Image kCrt0{.entry = 0x800DAE8Cu};
 
 constexpr psx::game::HostIdentity kHostIdentity{
-    .cardEnvVar = "PSXPORT_X4_CARD",
     .cardDefaultPath = "scratch/saves/megamanx4.mcr",
     .userDataName = "megamanx4",
 };
@@ -105,19 +102,6 @@ void Runtime::deliverPad(Core &core, const psx::input::PadDelivery &delivery) {
 
 const psx::present::GuestWidescreenProjection *Runtime::guestWidescreenProjection() const {
   return &widescreenPolicy_;
-}
-
-bool Runtime::titleCommand(Core &core, const psx::game::TitleCommandLine &input, std::FILE *reply) {
-  if (std::string_view(input.command) != "warp") {
-    return false;
-  }
-  const std::string answer = session(core).stageWarp.arm(input.args);
-  std::fprintf(reply, "%s\n", answer.c_str());
-  return true;
-}
-
-psx::game::TitleDevWarp *Runtime::devWarp(Core &core) const {
-  return &session(core).stageWarp;
 }
 
 void Runtime::reportRun(Core &core) const {

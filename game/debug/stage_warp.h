@@ -1,8 +1,5 @@
-// stage_warp.h — the control-channel `warp <stage> [part]` request.
+// stage_warp.h — the debug menu's `warp <stage> [part]` request.
 #pragma once
-
-#include "command_args.h"
-#include "game_runtime.h"
 
 #include <array>
 #include <cstdint>
@@ -15,7 +12,7 @@ namespace x4 {
 // Enters a stage the way the retail part-2 transition (FUN_800200D4) does: stage and part written, then
 // engine state 4, whose loader FUN_80013014 reads both. Armed between frames, applied at the next frame
 // boundary, and legal only while a stage is running.
-class StageWarp final : public psx::game::TitleDevWarp {
+class StageWarp final {
 public:
   // engine_obj: +0 state, +1 sub-state, +2 step, +0xC stage, +0xD part, +0xF stage-end cause,
   // +0x1E checkpoint marker.
@@ -48,17 +45,9 @@ public:
 
   explicit StageWarp(Core &core) : core_(core) {}
 
-  int areaCount() const override {
-    return static_cast<int>(kStageNames.size());
-  }
-  const char *areaName(int area) const override;
-  bool warpAllowed() const override {
-    return stageRunning(core_);
-  }
-
   static bool stageRunning(Core &core);
-  // The returned text answers the client.
-  std::string arm(const psx::debug::CommandArgs &args);
+  // Arms the request; the returned text answers the client. The debug menu checked the range and stageRunning().
+  std::string arm(std::uint32_t stage, std::uint32_t part);
   // Writes the armed request; the frame driver calls it only at a clean frame boundary.
   void applyArmed(std::uint32_t frame);
 
