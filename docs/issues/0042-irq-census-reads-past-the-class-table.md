@@ -17,3 +17,5 @@ are other data. The census read them as handlers.
 ## Proof
 `scratch/player-bugs/irq` (20 s from boot): `scanned 11 of 11 classes, 3 populated, 0 outside every code image` at every
 census, no error lines.
+
+Paced: the all-title real-time run (40 s, hidden, load 8.1) shows 0 error lines and 0 missed presents.
