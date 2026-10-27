@@ -1,5 +1,6 @@
 #pragma once
 
+#include "debug_menu.h"
 #include "game_runtime.h"
 #include "stock_dma_callbacks.h"
 #include "stock_libcd.h"
@@ -21,8 +22,9 @@ public:
   std::unique_ptr<psx::game::FrameDriver> createFrameDriver(Game &game) override;
   void deliverPad(Core &core, const psx::input::PadDelivery &delivery) override;
   const psx::present::GuestWidescreenProjection *guestWidescreenProjection() const override;
-  bool titleCommand(Core &core, const psx::game::TitleCommandLine &input, std::FILE *reply) override;
-  psx::game::TitleDevWarp *devWarp(Core &core) const override;
+  const psx::game::TitleDebugMenu &debugMenu() const override {
+    return debugMenu_;
+  }
   void reportRun(Core &core) const override;
   const psx::game::HostIdentity *hostIdentity() const override;
 
@@ -32,6 +34,7 @@ private:
   psx::cd::StockLibcd libcd_;
   psx::input::StockPadBuffers pad_;
   WidescreenPolicy widescreenPolicy_;
+  DebugMenu debugMenu_;
 };
 
 } // namespace x4

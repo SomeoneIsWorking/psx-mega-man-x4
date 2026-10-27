@@ -49,12 +49,12 @@ no row runs on the framework alone.
 
 | hop | joins | owner |
 |---|---|---|
-| 1 | psxport F-SAVE.1 | `game/runtime/runtime.cpp:x4::Runtime::hostIdentity` — card `PSXPORT_X4_CARD` (`scratch/saves/megamanx4.mcr`), user data under `megamanx4` |
+| 1 | psxport F-SAVE.1 | `game/runtime/runtime.cpp:x4::Runtime::hostIdentity` — card `PSXPORT_CARD` (`scratch/saves/megamanx4.mcr`), user data under `megamanx4` |
 
 ## F-DEBUG
 
 | hop | joins | owner |
 |---|---|---|
-| 1 | psxport F-DEBUG.1 | `game/runtime/runtime.cpp:x4::Runtime::titleCommand` — `warp <stage> [part]` |
+| 1 | psxport F-DEBUG.1 | `game/debug/debug_menu.cpp:x4::DebugMenu` — `warp <stage> [part]` |
 | 2 | psxport F-DEBUG.1 | `game/debug/stage_warp.cpp:StageWarp::applyArmed` — engine state 4 with the stage and part, applied by the frame driver at a frame boundary |
 | 3 | psxport F-DEBUG.2 | `game/debug/stage_warp.cpp:StageWarp` — the picker's 13 stages, legal while a stage is running |

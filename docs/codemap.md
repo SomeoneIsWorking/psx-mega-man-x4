@@ -53,6 +53,6 @@ overlays); `external/mmx4` is an AGPL matching-decomp reference that never enter
 - A cadence decision → `x4::Runtime::interpolates`.
 - A widened draw → `game/render/`; the value gameplay reads stays retail.
 - A title knob → `game/title/enhancements.*`, `docs/config.md`, `docs/behavior-map.md`.
-- A debug route to a screen → `game/debug/`, armed by `titleCommand`, applied by `x4::frame::FrameDriver`.
+- A debug route to a screen → `game/debug/`, declared in `x4::DebugMenu` (`game/debug/debug_menu.*`), applied by `x4::frame::FrameDriver`.
 - Co-op → new owners under `game/input/` over `player_object.h`, composed by `x4::Runtime`.
 - Anything every title shares → psxport. AGPL-derived code stays here (`LICENSING.md`).
