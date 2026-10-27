@@ -46,12 +46,13 @@ void observeField(Core &core, const char *phase) {
   const PacketRecord slot0 = packet(core, pad::kSlot0Buffer);
   const PacketRecord slot1 = packet(core, pad::kSlot1Buffer);
   lucent::debug("x4-input-path",
-                "{}: vbl={} resolved(buttons=0x{:04X}) "
+                "{}: vbl={} host(buttons=0x{:04X}) resolved(buttons=0x{:04X}) "
                 "gate(initialized={} irq_started={} shouldService={}) "
                 "guest(slot0_bytes=0x{:08X} slot0_buttons=0x{:04X} slot1_bytes=0x{:08X} "
                 "slot1_buttons=0x{:04X} held=0x{:04X} pressed=0x{:04X})",
                 phase,
                 core.mem_r32(vsync::kVblankCounter),
+                pad.hostButtons(),
                 pad.buttons,
                 hle.bios_pad_initialized,
                 hle.bios_pad_irq_started,

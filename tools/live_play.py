@@ -87,16 +87,15 @@ class Refusal(SystemExit):
 
 
 # Per-field input-path observer line (game/input/input_path.cpp), printed either side of Pad::serviceFrame.
-# The tap countdown is decremented inside serviceFrame, so the pre-service `tap_n` and the post-service
-# `buttons` must be paired. Each stage is compared with the previous stage's value.
+# A `tap` presses the virtual gamepad; the post-service `host` mask is what Pad read from it that frame and
+# `buttons` what it resolved. Each stage is compared with the previous stage's value.
 # Select by the bracketed channel tag the logger owns; a substring test also matched the config echo.
 INPUT_PATH_TAG = re.compile(rf"(?:^|\]\s)\[{re.escape(INPUT_PATH_CHANNEL)}\]\s")
 
 INPUT_PATH_LINE = re.compile(
     r"(?P<phase>pre-service|post-service): "
     r"vbl=(?P<vbl>\d+) "
-    r"repl\(on=(?P<on>\w+) tap=0x(?P<tap>[0-9A-Fa-f]{4}) tap_n=(?P<tap_n>-?\d+) "
-    r"hold=0x(?P<hold>[0-9A-Fa-f]{4})\) "
+    r"host\(buttons=0x(?P<host>[0-9A-Fa-f]{4})\) "
     r"resolved\(buttons=0x(?P<buttons>[0-9A-Fa-f]{4})\) "
     r"gate\(initialized=(?P<init>\w+) irq_started=(?P<irq>\w+) shouldService=(?P<gate>\w+)\) "
     r"guest\(slot0_bytes=0x(?P<slot0_bytes>[0-9A-Fa-f]{8}) "
@@ -107,9 +106,9 @@ INPUT_PATH_LINE = re.compile(
 )
 
 # Stages in the order the edge travels them. `endpoint` is measured from the reply to `tap`, not per field.
-FIELD_STAGES = ("repl", "resolved", "gate", "guest")
+FIELD_STAGES = ("host", "resolved", "gate", "guest")
 # The last correct stage when each per-field stage is the first to break.
-STAGE_BEFORE = {"repl": "endpoint", "resolved": "repl", "gate": "resolved", "guest": "gate"}
+STAGE_BEFORE = {"host": "endpoint", "resolved": "host", "gate": "resolved", "guest": "gate"}
 
 
 def truthy(token: str) -> bool:
@@ -141,10 +140,7 @@ def parse_input_path_counts(log: Path) -> tuple[list[dict], int, int]:
         parsed.append({
             "phase": row["phase"],
             "vbl": int(row["vbl"]),
-            "on": truthy(row["on"]),
-            "tap": int(row["tap"], 16),
-            "tap_n": int(row["tap_n"]),
-            "hold": int(row["hold"], 16),
+            "host": int(row["host"], 16),
             "buttons": int(row["buttons"], 16),
             "initialized": truthy(row["init"]),
             "irq_started": truthy(row["irq"]),
@@ -167,11 +163,12 @@ def parse_input_path_log(log: Path) -> tuple[list[dict], int]:
 def input_path_verdict(rows: list[dict], endpoint_taps: int) -> dict:
     """Where the edge died: the last stage at which it was still correct, over every edge field.
 
-    Pre/post lines are paired; an unpaired line is counted, never treated as a passing field. For each
-    field whose pre-service `tap_n` > 0 the expected mask is `repl_tap`, and the stages are compared in order:
+    Pre/post lines are paired; an unpaired line is counted, never treated as a passing field. A field whose
+    post-service `host` mask holds a press is an edge field with that mask expected, and the stages are compared
+    in order:
 
-        repl      the drive was armed (`on`) with a non-idle mask
-        resolved  post-service `buttons` == the mask the pre-service line used
+        host      the virtual gamepad's press reached Pad's host mask (no edge field while taps were sent breaks it)
+        resolved  post-service `buttons` == the host mask
         gate      the framework's BIOS-pad gate permits the write
         guest     the guest's slot-0 packet button halfword == the resolved mask
 
@@ -191,8 +188,8 @@ def input_path_verdict(rows: list[dict], endpoint_taps: int) -> dict:
             continue
         pre, post = pending, row
         pending = None
-        if pre["tap_n"] > 0:
-            fields.append({"pre": pre, "post": post, "expected": pre["tap"], "stages": {}})
+        if post["host"] != IDLE_ACTIVE_LOW:
+            fields.append({"pre": pre, "post": post, "expected": post["host"], "stages": {}})
     # A trailing pre-service line with no partner is counted as a hole.
     if pending is not None:
         unpaired += 1
@@ -200,14 +197,14 @@ def input_path_verdict(rows: list[dict], endpoint_taps: int) -> dict:
     for entry in fields:
         pre, post, expected = entry["pre"], entry["post"], entry["expected"]
         stages = entry["stages"]
-        stages["repl"] = bool(pre["on"] and expected != IDLE_ACTIVE_LOW)
+        stages["host"] = True
         stages["resolved"] = post["buttons"] == expected
         stages["gate"] = post["gate"]
         # The observer's mem_r16 read of the halfword at +2, not this tool's slice of the bytes.
         stages["guest"] = post["slot0_buttons"] == post["buttons"]
 
-    broken_at: str | None = None
-    for stage in FIELD_STAGES:
+    broken_at: str | None = "host" if endpoint_taps and not fields else None
+    for stage in FIELD_STAGES if broken_at is None else ():
         if any(not entry["stages"].get(stage, False) for entry in fields):
             broken_at = stage
             break
@@ -509,13 +506,14 @@ def wav_report(path: Path) -> dict:
 
 def running_instances() -> list[str]:
     """Any other product instance on this machine."""
-    listing = subprocess.run(["ps", "-eo", "pid,etimes,args"], capture_output=True, text=True,
+    listing = subprocess.run(["ps", "-eo", "comm=,pid=,etimes=,args="], capture_output=True, text=True,
                              check=True).stdout
-    return [line.strip() for line in listing.splitlines()
-            if "megamanx4_port" in line and "ps -eo" not in line]
+    # Match the process name, not its arguments: a shell whose command line names the binary is not one.
+    return [line.split(None, 1)[1].strip() for line in listing.splitlines()
+            if line.split(None, 1)[0] == EXECUTABLE.name]
 
 
-def launch(port: int, sink: str, wide: str, log: Path, wav: Path,
+def launch(executable: Path, port: int, sink: str, wide: str, log: Path, wav: Path,
            input_path_trace: bool = False) -> subprocess.Popen:
     """The product: headless, silent, unpaced, live endpoint on this run's own port.
 
@@ -541,12 +539,12 @@ def launch(port: int, sink: str, wide: str, log: Path, wav: Path,
     log.write_text("")  # the logger appends
     if wav.exists():
         wav.unlink()
-    for required in (EXECUTABLE, IMAGE):
+    for required in (executable, IMAGE):
         if not required.is_file():
             raise Refusal(f"REFUSED: {required} is missing — NOTHING WAS RUN. Build with "
                           f"`cmake --build build --target megamanx4_port -j$(nproc)` and provision the "
                           f"authenticated executable first; this tool does not build and does not extract.")
-    return subprocess.Popen([str(EXECUTABLE), str(IMAGE)], cwd=REPO, env=environment,
+    return subprocess.Popen([str(executable), str(IMAGE)], cwd=REPO, env=environment,
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
@@ -1049,11 +1047,11 @@ def report(session: Session, client: LiveClient, log: Path) -> int:
         if verdict_input["edge_fields"] == 0:
             print(f"[live]     NO EDGE FIELD was observed: the endpoint was asked for "
                   f"{verdict_input['endpoint_taps']} pad command(s) and the observer saw "
-                  f"{verdict_input['edge_fields']} field(s) whose tap countdown was live. This run did not "
-                  f"MEASURE the path — it asked no question of it.")
+                  f"{verdict_input['edge_fields']} field(s) whose host mask held a press, so the edge died at "
+                  f"`host`: the virtual gamepad never reached Pad.")
         else:
             print(f"[live]     {verdict_input['edge_fields']} of {len(rows) // 2} observed field(s) "
-                  f"consumed a tap count; the gate was open on "
+                  f"held a press in the host mask; the gate was open on "
                   f"{verdict_input['gate_open_fields']} of them; "
                   f"{verdict_input['delivered_fields']} reached the guest's own packet word")
             if verdict_input["broken_at"] is None:
@@ -1351,14 +1349,14 @@ def main() -> int:
         raise Refusal("REFUSED: refusing to start a second product instance; already running:\n  "
                       + "\n  ".join(others))
     framework_dir = (REPO / "external" / "psxport").resolve()
-    print(f"[live] product: {EXECUTABLE.relative_to(REPO)}  framework {framework_dir}")
+    print(f"[live] product: {arguments.executable}  framework {framework_dir}")
     print(f"[live] boot image: {IMAGE.relative_to(REPO)}  settings: {SETTINGS.relative_to(REPO)}")
     print(f"[live] log: {LOG.relative_to(REPO)}  audio sink: {WAV.relative_to(REPO)}  "
           f"screenshots: {SHOT_DIR.relative_to(REPO)}")
 
     wide = "0" if arguments.narrow else "1"
     sink = "960x720" if arguments.narrow else "1284x720"
-    process = launch(arguments.port, sink, wide, LOG, WAV,
+    process = launch(arguments.executable.resolve(), arguments.port, sink, wide, LOG, WAV,
                      input_path_trace=arguments.input_path_trace)
     client: LiveClient | None = None
     try:
