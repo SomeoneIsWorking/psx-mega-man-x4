@@ -555,7 +555,9 @@ def connect(port: int, seconds: float, log: Path) -> LiveClient:
     last: OSError | None = None
     while time.monotonic() < deadline:
         try:
-            return LiveClient(port)
+            client = LiveClient(port)
+            client.frame()
+            return client
         except OSError as error:
             last = error
             time.sleep(0.05)
