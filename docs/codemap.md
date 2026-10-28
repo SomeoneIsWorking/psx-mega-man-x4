@@ -5,7 +5,7 @@ framework side is `external/psxport/docs/codemap.md`. The boot executable is the
 overlays); `external/mmx4` is an AGPL matching-decomp reference that never enters psxport.
 `runtime/` and `frame/frame_driver.h` are included through their directory (`"runtime/session.h"`); the other `game/` directories sit on the include path.
 
-Frame loop: owned. `x4::frame::FrameDriver` runs one iteration of gameMain `0x80012024`'s loop and replaces its VSync(0) with one field; nested VSync(n) waits outside the loop park one field each (`vsync_sync.*`).
+Frame loop: owned. `x4::frame::FrameDriver` runs one iteration of gameMain `0x80012024`'s loop and replaces its VSync(0) with one field; a nested VSync(n) inside a task parks the task for n fields (`fieldsForMode`: 0 is one, 1 none), one driver step and field per park (`vsync_sync.*`); the music stream's VSync(3) `0x80016ED4` yields 3 (`music_stream.*`). No wait is extended when the guest clock ran past n.
 
 ## Owners
 
