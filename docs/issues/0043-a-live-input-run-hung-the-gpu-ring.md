@@ -22,7 +22,7 @@ context is innocent`. Before it the log is a continuous `sink idle, no swapchain
 field (1,000+ skipped fields), and the run's worst present interval is 1677.51 ms. The paced 40 s run on HEAD
 (`paced40-final`) did not fault. So it needs no live input; the unpaced sink-idle path is the next place to look.
 This fault wrote the `~/.config/psxport/gpu_fault` marker every later run of every title warns about (psxport issue
-0189).
+0189); the forced-fault runs of this pass rewrote it, and it was deleted on 2026-10-28.
 
 ## Cause and fix, 2026-10-28
 The hung submission was a record of 32,763 copies of one full-screen semi-transparent rectangle (GP0 0x62, packet
@@ -43,6 +43,10 @@ disables it, and a forced fault holds at 0.8 GB VRAM / 134 MB GTT.
 Shown: five unpaced hidden boot runs of 65 s (ires 0, fps60 1, 3840x2160 sink, no input;
 `scratch/player-bugs-6/ring/proof1..5`), 275-329 budget resumes each, no GPU fault, no OT cycle, no kernel ring
 timeout; proof1's presents at 3000/9000/15000/21000/27000 show the intro movie, the 16:9 attract demo and later
-movie frames.
+movie frames. A review boot (`ring/review2`, 66 s) had 271 parked turns and no fault.
+
+Limits: a task over budget under a main-side `ChangeTh` outside `UpdateTasks` has no field to park in and aborts;
+no run has reached that. Ending the session while `UpdateTasks` is parked unwinds its fiber across the guest frames
+on its stack, as ending one parked inside a task fiber already did.
 
 Status: fixed.
