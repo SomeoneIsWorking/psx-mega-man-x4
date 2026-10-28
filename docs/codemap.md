@@ -16,7 +16,7 @@ overlays); `external/mmx4` is an AGPL matching-decomp reference that never enter
 | `deliverField`, `serveVSync` | `game/frame/vsync_sync.*` | The one per-field service (IRQ-0, pad, SPU, snapshot, commit) and libetc VSync `0x800E4DB0` |
 | `guest::dispatch`, `guest::call`, `callWithoutKnownReturn` | `game/execution/guest_execution.*` | Guest calls, a retail `jal` site (`CallSite`) and their measured return boundaries |
 | `native_overrides::install` | `game/execution/native_overrides.*` | The loading-owner overrides against the authenticated image |
-| `bios_threads::Service` | `game/execution/bios_threads.*` | OpenTh/ChangeTh/CloseTh under the retail scheduler, task turn budget, `frameInProgress` |
+| `bios_threads::Service` | `game/execution/bios_threads.*` | OpenTh/ChangeTh/CloseTh under the retail scheduler, task turn budget; retail `UpdateTasks` on its own fiber so an over-budget task parks it mid-loop (`runUpdateTasks`, `frameInProgress`) |
 | `pad` constants | `game/input/pad_layout.h` | The two InitPAD receive buffers |
 | `input_path::observeField` | `game/input/input_path.*` | Read-only per-field trace of a pad edge (`x4-input-path` channel) |
 | `SequenceSkip` | `game/input/sequence_skip*.*` | Start held in the Hunter H.Q. briefing pages it through the pad route `0x80012328` |
