@@ -153,8 +153,10 @@ void FrameDriver::stepFrame(Core &core, std::uint32_t frame) {
       return;
     }
   }
-  guest::call(core, dispatch_, {kUpdateTasks, 0x800120ECu, 5u});
-  if (movieCleanup_->ownsPicture() || tasks_->frameInProgress()) {
+  const bool tasksReturned = tasks_->runUpdateTasks([this, &core] {
+    guest::call(core, dispatch_, {kUpdateTasks, 0x800120ECu, 5u});
+  });
+  if (movieCleanup_->ownsPicture() || !tasksReturned) {
     return;
   }
   runRetailFrameSuffix(core, dispatch_);

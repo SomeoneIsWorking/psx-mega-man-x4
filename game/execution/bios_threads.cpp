@@ -461,6 +461,7 @@ bool Service::change(uint32_t handle) {
                 core_.pc,
                 core_.r[31]);
   thread.fiber->resume();
+  parkUpdateTasksWhileOverBudget(target);
   thread.regs = static_cast<R3000 &>(core_);
   activeSlot_ = 0;
   static_cast<R3000 &>(core_) = mainRegs_;
@@ -468,17 +469,50 @@ bool Service::change(uint32_t handle) {
   return true;
 }
 
-bool Service::spendBudgetTurn() {
-  return ++threads_[activeSlot_].budgetTurns >= kMaxTurnFields;
+void Service::parkUpdateTasksWhileOverBudget(int slot) {
+  Thread &thread = threads_[slot];
+  while (thread.fiber && !thread.fiber->done() && thread.budgetTurns != 0u) {
+    if (!inUpdateTasks_) {
+      lucent::error("x4-thread",
+                    "task slot {} (entry 0x{:08X}) ran out of turn budget under a main-side ChangeTh outside "
+                    "retail UpdateTasks 0x80012600, which has no field to park in",
+                    slot,
+                    thread.entry);
+      std::abort();
+    }
+    thread.regs = static_cast<R3000 &>(core_);
+    activeSlot_ = 0;
+    static_cast<R3000 &>(core_) = mainRegs_;
+    updateTasksParked_ = true;
+    updateTasks_->yield();
+    updateTasksParked_ = false;
+    static_cast<R3000 &>(core_) = thread.regs;
+    activeSlot_ = slot;
+    thread.fiber->resume();
+  }
 }
 
-bool Service::frameInProgress() const {
-  for (int slot = 1; slot < kThreadCount; ++slot) {
-    if (threads_[slot].open && threads_[slot].budgetTurns != 0u) {
-      return true;
-    }
+bool Service::runUpdateTasks(const std::function<void()> &call) {
+  if (!updateTasks_) {
+    updateTasks_ = std::make_unique<Coro>();
+    updateTasks_->start([this] {
+      for (;;) {
+        inUpdateTasks_ = true;
+        updateTasksCall_();
+        inUpdateTasks_ = false;
+        updateTasks_->yield();
+      }
+    });
   }
-  return false;
+  if (!updateTasksParked_) {
+    updateTasksCall_ = call;
+  }
+  updateTasks_->resume();
+  return !updateTasksParked_;
+}
+
+bool Service::spendBudgetTurn() {
+  return ++threads_[activeSlot_].budgetTurns >= kMaxTurnFields;
 }
 
 void Service::yieldToMain() {

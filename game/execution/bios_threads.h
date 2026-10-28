@@ -56,9 +56,14 @@ public:
   // yielding through ChangeTh or reaching a field wait.
   [[nodiscard]] bool spendBudgetTurn();
 
-  // A task parked on an exhausted turn budget is still inside its guest frame: retail's UpdateTasks has not
-  // returned, so the draw prefix and tail must not run for it.
-  [[nodiscard]] bool frameInProgress() const;
+  // Runs retail UpdateTasks through `call`, or resumes the one parked inside a task's over-budget turn.
+  // False while it is parked: that task resumes next field and UpdateTasks continues after it, never from slot 0.
+  [[nodiscard]] bool runUpdateTasks(const std::function<void()> &call);
+
+  // UpdateTasks is parked inside a task's over-budget turn, so the draw prefix and tail must not run.
+  [[nodiscard]] bool frameInProgress() const {
+    return updateTasksParked_;
+  }
 
   // Whether a field wait has a fiber to park; the main TCB never has one.
   [[nodiscard]] bool inTaskFiber() const {
@@ -117,6 +122,11 @@ private:
   int activeSlot_ = 0;
   TurnCensus turnCensus_{};
   SwitchCensus switchCensus_{};
+  // Retail UpdateTasks on its own fiber, so an over-budget task turn can end the host field inside it.
+  std::unique_ptr<Coro> updateTasks_;
+  std::function<void()> updateTasksCall_;
+  bool inUpdateTasks_ = false;
+  bool updateTasksParked_ = false;
 
   [[nodiscard]] static int slotForHandle(uint32_t handle);
   // Host owner of one task body: dispatch, park on each field boundary, resume at the typed exit PC.
@@ -124,6 +134,8 @@ private:
   void startFiber(int slot);
   void finishDeferredClose(int slot);
   void reportSwitchCensus() const;
+  // Main side of ChangeTh: an over-budget turn parks UpdateTasks for the field, then resumes the same task.
+  void parkUpdateTasksWhileOverBudget(int slot);
 };
 
 void install(Game &game);
