@@ -4,6 +4,17 @@ A PC-native port of **Mega Man X4** (PS1, USA, `SLUS_005.61`) built on the
 [psxport](https://github.com/SomeoneIsWorking/psxport), using native title subsystems plus runtime
 Lightrec translation of the authenticated executable.
 
+## Screenshots
+
+Captures of the running port (attract demos, 4:3, presented at 1080p).
+
+![X on the opening highway stage, firing at a swarm of bee mechaniloids](docs/media/x-highway.png)
+![X facing the opening stage's boss under the searchlights](docs/media/x-boss.png)
+![Zero dashing and firing through the frozen base](docs/media/zero-ice.png)
+
+16:9 captures and a 60 fps gameplay clip are held back until `docs/issues/0044` (margin tiles drop
+out) and `docs/issues/0045` (a repeated frame about every 20 fields) are fixed.
+
 Unlike psxport's other consumers this is an **enhancement port, not a native-engine rebuild**: X4
 already runs at 60fps, so there is no frame interpolation, no native producer and no native renderer to
 build. The three deliverables are widescreen, drop-in co-op (P2 spawns as the other hunter), and
