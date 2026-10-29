@@ -1,7 +1,7 @@
 ---
 id: 45
 title: Gameplay repeats a picture about every 20 fields where the console runs at a full 60 fps
-status: open
+status: fixed
 symptom: In the attract demos about one present in twenty repeats the previous one (a one-field hitch, ~3 per second); the Beetle console reference shows no repeat over the same demo
 tags: timing,frame-loop,cpu-cost,psxport
 state_items: S003
@@ -20,21 +20,25 @@ same demo from 240 to 640 fields after it starts, 400 fields, 0 repeated picture
 
 ## Cause
 
-The repeats are the retail gameplay task `0x8001DAF8` running out of its turn budget: each one logs `needed more than one
-display field of guest CPU and was RESUMED` (199 in a 30,000-present run), and the parked frame presents a field late
-(`game/execution/bios_threads.cpp:Service::runGuestEntry`). The budget is `psx::cpu::ExecutionBudget::currentTurn`, one
-field of 566,206 Lightrec cycles, and Lightrec charges a flat 2 cycles per instruction (psxport
-`runtime/cpu/segment_clock.h`), so a turn holds 283,103 instructions. Demo 2's gameplay turns take 202K-566K Lightrec
-cycles (median 364K; a temporary per-turn log, `scratch/readme-media/inv3/run.log`); the ones above 566K are the
-repeats. The console finishes the same frames inside a field, so X4's real cost is below 2 cycles per instruction there.
+`x4::bios_threads::Service::change` (`game/execution/bios_threads.cpp`) answered the gameplay task's per-frame
+`ChangeTh(main)` (`func_800127C8`, called at the end of every `0x8001DAF8` loop) by yielding the task fiber from
+inside the ChangeTh callback. The executor call that ran the task never returned, so the next frame resumed inside
+the same call and its one-field budget (566,206 instructions) accumulated across every frame since the last field
+wait. Each time the total passed a field, a spurious `BudgetExhausted` came back, `runGuestEntry` logged `RESUMED` and
+parked the task for a field: a repeated picture every 20-30 fields. Per-turn counts (temporary `x4-turn` log,
+`scratch/filed-defects/0045/turns.txt`): 174 exhaustions in 30,000 steps, all at 566,2xx instructions with diffuse
+PCs, and no frame-boundary turn logged after gameplay began. The console oracle runs the same demo at about 300K
+instructions per frame including the main loop (`oracle_turns.py`, VSync(0) to VSync(0)).
 
-## Proper fix
+## Fix
 
-The guest CPU cost model psxport issue 0007 defers: per-opcode, memory wait-state and GTE stall costs in the one
-`EmulatedTime` owner, with the turn budget in the same units, calibrated against the console oracle's cycle timestamps
-across titles. This span (demo 2, 240-640 fields in) is an X4 calibration case: the console shows no repeat. A
-different flat factor would only move which frames drop.
+`Service::change` now ends the task's turn with a typed `CooperativeYield` exit at the ChangeTh return address;
+`runGuestEntry` parks the fiber there like a field wait, and the next turn starts a fresh budget. A task that closed
+itself (`func_800127FC`) parks once the same way.
 
-## Captures held back
+## Shown
 
-The README carries no gameplay clip until this is fixed (2026-10-29 README media pass).
+Hidden unpaced boot, no input, `ires=0`, sink 3840x2160: 3 budget resumes in 30,000 steps (was 174), all at
+0x800264D0 in load-time turns; the census reads 23,798 field-boundary turns, 6,447 ChangeTh turns. Attract demo 2
+(engine 5, stage 0) from step 29,381: `preseq 240`, 0 presents equal the one before (13 of 260 before the fix). The
+console oracle: 0 repeats over 400 fields of the same demo.

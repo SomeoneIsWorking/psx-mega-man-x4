@@ -97,6 +97,7 @@ private:
   struct TurnCensus {
     std::uint64_t turns = 0;
     std::uint64_t fieldResumes = 0;
+    std::uint64_t yieldResumes = 0;
     std::uint64_t budgetResumes = 0;
     std::uint64_t budgetCycles = 0;
     std::uint64_t retirements = 0;
