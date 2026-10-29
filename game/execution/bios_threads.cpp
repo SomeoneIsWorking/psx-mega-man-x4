@@ -2,6 +2,7 @@
 
 #include "core.h"
 #include "coro.h"
+#include "execution_control.h"
 #include "execution_exit.h"
 #include "game.h"
 #include "guest_execution.h"
@@ -41,18 +42,20 @@ void Service::reportSwitchCensus() const {
 }
 
 void Service::reportCensus(std::string_view phase) const {
-  lucent::info("x4-thread",
-               "task-turn census ({}): {} task turn(s) dispatched; {} ended at a guest field boundary "
-               "and {} ended BudgetExhausted over {} guest cycle(s); {} activation(s) reached their "
-               "own return address and RETIRED. Denominator: {} of {} turn(s) needed a budget resume",
-               phase,
-               turnCensus_.turns,
-               turnCensus_.fieldResumes,
-               turnCensus_.budgetResumes,
-               turnCensus_.budgetCycles,
-               turnCensus_.retirements,
-               turnCensus_.budgetResumes,
-               turnCensus_.turns);
+  lucent::info(
+      "x4-thread",
+      "task-turn census ({}): {} task turn(s) dispatched; {} ended at a guest field boundary, "
+      "{} at a ChangeTh to main and {} ended BudgetExhausted over {} guest cycle(s); {} activation(s) reached their "
+      "own return address and RETIRED. Denominator: {} of {} turn(s) needed a budget resume",
+      phase,
+      turnCensus_.turns,
+      turnCensus_.fieldResumes,
+      turnCensus_.yieldResumes,
+      turnCensus_.budgetResumes,
+      turnCensus_.budgetCycles,
+      turnCensus_.retirements,
+      turnCensus_.budgetResumes,
+      turnCensus_.turns);
   reportSwitchCensus();
 }
 
@@ -142,7 +145,8 @@ void Service::runGuestEntry(Core &core, uint32_t entry) {
       from(core).yieldToMain();
       continue;
     }
-    if (result.reason != psx::cpu::ExecutionExitReason::FrameBoundary) {
+    if (result.reason != psx::cpu::ExecutionExitReason::FrameBoundary &&
+        result.reason != psx::cpu::ExecutionExitReason::CooperativeYield) {
       // guestPc is the branch target, not the branching instruction; dump every register.
       lucent::error("x4-thread",
                     "guest task 0x{:08X} faulted: pc=0x{:08X} r31=0x{:08X} vblank=0x{:08X} — the r31 "
@@ -238,9 +242,11 @@ void Service::runGuestEntry(Core &core, uint32_t entry) {
       std::abort();
     }
 
-    // Frame boundaries keep this task's stacks; the frame driver resumes at the typed guest PC.
+    // A field wait or a ChangeTh to main ends the turn; the next turn resumes at the typed guest PC with a fresh
+    // budget.
     threads_[activeSlot_].budgetTurns = 0u;
-    ++turnCensus_.fieldResumes;
+    ++(result.reason == psx::cpu::ExecutionExitReason::FrameBoundary ? turnCensus_.fieldResumes
+                                                                     : turnCensus_.yieldResumes);
     resumeAddress = result.guestPc;
     suspended = true;
     from(core).yieldToMain();
@@ -377,11 +383,9 @@ bool Service::change(uint32_t handle) {
     if (target != 0) {
       return false;
     }
-    Thread &running = threads_[activeSlot_];
-    // A guest-authored yield is the task finishing a frame, so the over-budget run starts again.
-    running.budgetTurns = 0u;
-    running.regs = static_cast<R3000 &>(core_);
-    running.fiber->yield();
+    // The task's turn ends here, so the executor call and its field budget never span frames; runGuestEntry parks.
+    psx::cpu::requestExecutionExit(
+        core_, {psx::cpu::ExecutionExitReason::CooperativeYield, core_.r[31], 0u, "Mega Man X4 ChangeTh to main"});
     return true;
   }
 
@@ -521,7 +525,8 @@ void Service::yieldToMain() {
     std::abort();
   }
   Thread &running = threads_[activeSlot_];
-  if (!running.open || !running.fiber || running.fiber->done()) {
+  // A task that closed itself still parks once, on its ChangeTh to main.
+  if ((!running.open && !running.closePending) || !running.fiber || running.fiber->done()) {
     lucent::error("x4-thread", "title field yield has no live retail task fiber");
     std::abort();
   }
