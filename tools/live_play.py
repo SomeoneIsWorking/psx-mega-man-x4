@@ -517,7 +517,7 @@ def launch(executable: Path, port: int, sink: str, wide: str, log: Path, wav: Pa
            input_path_trace: bool = False) -> subprocess.Popen:
     """The product: headless, silent, unpaced, live endpoint on this run's own port.
 
-    `agent_environment` refuses without a named settings file. PSXPORT_DEBUG_SERVER leaves the run
+    `agent_environment` gives the run its own copy of SETTINGS. PSXPORT_DEBUG_SERVER leaves the run
     uncapped (`psx::host::RunBudget`); `quit` ends it. PSXPORT_DEBUG is set at launch so the movie phase is observed.
     PSXPORT_PRESENT_SINK fixes the readback size (1284x720 is 4/3 of the 428-wide widescreen
     projection). The caller's environment is kept so the product finds a Vulkan ICD and a config dir.
