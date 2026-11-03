@@ -55,6 +55,6 @@ no row runs on the framework alone.
 
 | hop | joins | owner |
 |---|---|---|
-| 1 | psxport F-DEBUG.1 | `game/debug/debug_menu.cpp:x4::DebugMenu` — `warp <stage> [part]` |
+| 1 | psxport F-DEBUG.1 | `game/debug/debug_menu.cpp:x4::DebugMenu` — `warp <stage>/<part>` (catalogue of the 13 stage names, parts 0 and 1) |
 | 2 | psxport F-DEBUG.1 | `game/debug/stage_warp.cpp:StageWarp::applyArmed` — engine state 4 with the stage and part, applied by the frame driver at a frame boundary |
 | 3 | psxport F-DEBUG.2 | `game/debug/stage_warp.cpp:StageWarp` — the picker's 13 stages, legal while a stage is running |

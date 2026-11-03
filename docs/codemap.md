@@ -39,7 +39,7 @@ Frame loop: owned. `x4::frame::FrameDriver` runs one iteration of gameMain `0x80
 | `vram_rect` | `game/render/vram_rect_queue.*` | The eight-entry VRAM rectangle upload queue |
 | `title_quad` | `game/ui/title_quad.*` | The white quad behind the MEGAMAN logo |
 | `WidescreenPolicy`, `WidescreenController` | `game/widescreen/widescreen_controller.*` | Requested aspect and the per-Core projection plan and cull margin |
-| `StageWarp` | `game/debug/stage_warp.*` | `warp <stage> [part]` through engine state 4, applied at a frame boundary |
+| `StageWarp` | `game/debug/stage_warp.*` | The stage arrival through engine state 4, applied at a frame boundary |
 | `PlayerLens`, `CameraLayerLens`, `PadLens` | `game/title/player_object.h` | Read-only views of the player, camera layer and pad structures |
 | `widescreenCvar`, `coopCvar`, `fastWaitCvar`, `skipCvar` | `game/title/enhancements.*` | The `pc_enh` knobs (`docs/config.md`) and the unread-knob line |
 | launcher | `tools/run.py`, `tools/resolve_disc.py`, `tools/extract_exe.py` | Disc resolution, extraction and authentication for the zero-argument launch |

@@ -4,21 +4,32 @@
 #include "runtime/session.h"
 #include "stage_warp.h"
 
+#include <lucent/log.h>
+
+#include <vector>
+
 namespace x4 {
 
 DebugMenu::DebugMenu() {
-  using psx::game::DebugCall;
-  using psx::game::DebugNames;
-  using psx::game::DebugParam;
-  section("Stage Warp");
-  verb({
-      .name = "warp",
-      .summary = "Load that stage",
-      .params = {DebugParam::named("stage", DebugNames::of(StageWarp::kStageNames)),
-                 DebugParam::integer("part", 0, StageWarp::kPartCount - 1).orAbsent()},
-      .run =
-          [](const DebugCall &call) {
-            call.reply = session(call.core).stageWarp.arm(call.values.u32(0), call.values.u32(1));
+  warp({
+      .levels = {"stage", "part"},
+      .places =
+          [](Core &) {
+            std::vector<psx::game::WarpPlace> stages;
+            for (std::uint32_t stage = 0; stage < StageWarp::kStageNames.size(); ++stage) {
+              psx::game::WarpPlace place{.name = StageWarp::kStageNames[stage]};
+              for (std::uint32_t part = 0; part < StageWarp::kPartCount; ++part) {
+                place.places.push_back({
+                    .name = lucent::format("part {}", part),
+                    .arrive =
+                        [stage, part](Core &core) {
+                          return session(core).stageWarp.arm(stage, part);
+                        },
+                });
+              }
+              stages.push_back(std::move(place));
+            }
+            return stages;
           },
       .refusal =
           [](Core &core) {
