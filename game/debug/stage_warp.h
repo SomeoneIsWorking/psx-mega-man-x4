@@ -1,4 +1,4 @@
-// stage_warp.h — the debug menu's `warp <stage> [part]` request.
+// stage_warp.h — a stage/part arrival of the warp catalogue.
 #pragma once
 
 #include <array>
