@@ -11,7 +11,7 @@ The framework's knobs, the ladder's implementation and the whole `cfg_*` / CVar 
 
 ```
     Default   what the framework compiled in
-  < Value     the user's persisted choice (psxport_settings.ini)
+  < Value     the persisted choice (the player's user-data settings.ini, or PSXPORT_SETTINGS)
   < Override  a launch argument — the PSXPORT_* environment variable. Never persisted.
   < Runtime   a REPL / debug-server command. This run only. Never persisted.
 ```
@@ -44,7 +44,7 @@ The menu therefore offers no 60fps interpolation, and this repository's settings
 The no-argument policy is therefore unambiguous. `PSXPORT_X4_WIDESCREEN` is the product default and only
 switches the enhancement off: when it is on, the player's Aspect Ratio row (`Mods::aspect`, the `aspect=`
 settings key) chooses 4:3, 16:9, 21:9 or Auto (`x4::WidescreenPolicy::presentationAspect`). The tracked
-`psxport_settings.ini` carries `aspect=1` for tool runs; a comparison or recordcheck run passes its own
+`tools/shipping_settings.ini` seeds tool runs with `aspect=1`; a comparison or recordcheck run passes its own
 settings file with `aspect=0` (`docs/issues/0024`).
 
 ## Native-override differential checks
