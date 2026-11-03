@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Mega Man X4
+GenericName=Action game
+Comment=PC-native port of Mega Man X4
+Icon=dev.someoneisworking.megamanx4
+Terminal=false
+Categories=Game;ActionGame;
+Keywords=Mega Man;X4;PlayStation;Run and gun;Port;
+StartupNotify=true
