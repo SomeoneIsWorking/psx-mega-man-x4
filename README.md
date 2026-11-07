@@ -88,3 +88,5 @@ not the decomp's to relicense, and that the framework's own terms are currently 
 **psxport is not AGPL, and no code from this repo may be pushed upstream into it.** The framework is
 vendored by five ports; copyleft landing there would pull all of them in. That firewall is stated in
 `CLAUDE.md` and `docs/references.md` and checked by `tools/check_license_containment.py`.
+
+Built with AI assistance (Claude and other LLMs).
