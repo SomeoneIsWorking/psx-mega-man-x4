@@ -1,8 +1,63 @@
-# Mega Man X4 port agent instructions
+# Mega Man X4 port
 
-This is the repository-local discovery entry point for agents that load `AGENTS.md`.
+The USA `SLUS_005.61` enhancement port. The authenticated executable is runtime data;
+`external/psxport` owns PSX and Lightrec execution, while this repository owns title identity,
+measured native behavior, and widescreen, loading removal, drop-in/drop-out X/Zero co-op and
+skippable dialogue and sequences. Framework contract: `external/psxport/AGENTS.md`; workspace:
+`../AGENTS.md`. `docs/features.md` traces each player-visible feature through its owners.
 
-Read [`CLAUDE.md`](CLAUDE.md) completely for the game-specific authority. When this repository is
-inside the PSX workspace, also read [`../AGENTS.md`](../AGENTS.md) and
-[`external/psxport/AGENTS.md`](external/psxport/AGENTS.md). This shim deliberately does not duplicate
-those rules.
+## Title boundaries
+
+Every directory under `game/` owns one subsystem (`runtime`, `debug`, `frame`, `execution`, `input`,
+`media`, `render`, `ui`, `widescreen`, `title`).
+
+- `x4::createCatalog` (`game/runtime/catalog.cpp`) is the product: psxport's `SingleTitleCatalog` that the framework `main` runs
+  through `psx::host::ProductHost`, which owns the command line, provisioning, the boot order and the
+  loop. Its `x4::Runtime : psx::game::GameRuntime` is the title owner: crt0 and the measured boot
+  prefix (`startProgram`), stock VSync/DMA-callback/libcd/pad bindings and image-scoped native
+  overrides (`registerOverrides`), the per-`Core` `x4::Session`, render-path policy, `x4::frame::FrameDriver`,
+  the `warp` debug option and the run-end censuses (`reportRun`). Title behaviour is a virtual on
+  `x4::Runtime` or a typed owner it composes, never a config or callback table.
+- `x4::frame::FrameDriver::stepFrame()` owns one retail field. The per-field host services belong in
+  `x4::vsync::deliverField` (`game/frame/vsync_sync.cpp`): retail IRQ-0 delivery, pad service, SPU
+  advance, snapshot tick, and presentation commit. Full guest libetc VSync `0x800E4DB0` is served by
+  the image-scoped override in the same file; do not alter movie bodies to simulate suspension or
+  progress.
+- The guest's own GP0 work, replayed on psxport's record path, is the picture. X4 already runs at
+  60 fps, so native producers, frame interpolation, and native depth are outside this port's scope.
+  Do not link temporal `Fps60` machinery or select a guaranteed-black native render path.
+- Widescreen, loading removal, co-op and sequence skip are `pc_enh` changes with `affect: full`.
+  Typed comparison runs suppress them. Read every enhancement knob through
+  `psx::config::enh(x4::<knob>Cvar())`, never `.get()`. `docs/config.md` owns the knobs;
+  `docs/behavior-map.md` owns their divergence and comparison behavior, and
+  `tools/behavior.py check` checks it.
+- Keep raw CD I/O latency and removal of the retail loading coroutine as separate behaviors. A
+  combined "load time" number establishes neither. Co-op needs its own evidence: a comparison run
+  with co-op suppressed proves only baseline parity.
+
+## Evidence and source boundaries
+
+- Bind every guest address and native override to the exact `SLUS_005.61` image identity
+  (SHA-1 `213733031136d095ca275d6957695aa25011cfa5`). A matching-decomp symbol is a lead until this
+  repository measures it against these bytes. Leave an unmeasured compatibility field at zero with
+  its open step named; never guess a value.
+- `external/mmx4` is an AGPL-3.0 matching decompilation. AGPL-derived title code stays in this
+  repository and never enters psxport; `LICENSING.md` and `tools/check_license_containment.py` own
+  that boundary. Sony PSY-Q headers in the reference are not available for copying. Fetch only
+  `external/mmx4`, without recursively initializing its build-tool submodules.
+- `external/psxport` resolves to the workspace's live framework checkout, or to a clone of its main
+  where there is none. psxport's `tools/psxport_fetch.py`, run from psxport `main` by `tools/run.py`,
+  establishes it; there is no framework pin, so a framework change in psxport is immediately this
+  port's framework.
+- Disc resolution is implemented once in `tools/resolve_disc.py`: explicit argument,
+  `PSXPORT_X4_DISC`, `.env`, then an unambiguous repository-root CHD. The exact executable must pass
+  `tools/extract_exe.py` identity validation.
+
+## Commands
+
+- There are no unit tests. Build with `CC=clang CXX=clang++ uv run --frozen python
+  external/psxport/tools/port/consumer_build.py --build build/agent --target megamanx4_port`.
+- `tools/live_play.py` and `tools/title_prompts.py` drive a headless run over the control channel:
+  input, front-end state, presents, and frame captures.
+- A past native run is not Lightrec gameplay evidence. Verify the shipping dispatcher, including a
+  reached native override and its scoped original call, before claiming dynarec behavior.
