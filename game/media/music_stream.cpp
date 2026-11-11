@@ -3,6 +3,7 @@
 #include "core.h"
 #include "coro.h"
 #include "execution_services.h"
+#include "game.h"
 #include "guest_execution.h"
 #include "native_dispatch.h"
 
@@ -129,7 +130,7 @@ bool State::dispatchBeforeObjectsB(guest::Dispatch dispatch) {
     }
 
     dispatch_ = dispatch;
-    transaction_ = std::make_unique<Coro>();
+    transaction_ = std::make_unique<Coro>(core_.game->perf.clock());
     transaction_->start([this] {
       dispatch_(&core_, kBeforeObjectsB);
     });

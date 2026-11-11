@@ -357,7 +357,7 @@ bool Service::close(uint32_t handle) {
 
 void Service::startFiber(int slot) {
   Thread &thread = threads_[slot];
-  thread.fiber = std::make_unique<Coro>();
+  thread.fiber = std::make_unique<Coro>(core_.game->perf.clock());
   thread.fiber->start([this, slot] {
     Thread &running = threads_[slot];
     entryRunner_(core_, running.entry);
@@ -498,7 +498,7 @@ void Service::parkUpdateTasksWhileOverBudget(int slot) {
 
 bool Service::runUpdateTasks(const std::function<void()> &call) {
   if (!updateTasks_) {
-    updateTasks_ = std::make_unique<Coro>();
+    updateTasks_ = std::make_unique<Coro>(core_.game->perf.clock());
     updateTasks_->start([this] {
       for (;;) {
         inUpdateTasks_ = true;
