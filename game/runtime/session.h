@@ -2,6 +2,7 @@
 #pragma once
 
 #include "bios_threads.h"
+#include "coop.h"
 #include "fast_wait.h"
 #include "game_runtime.h"
 #include "movie_cleanup.h"
@@ -34,6 +35,7 @@ public:
   cull::WidenedObjects widenedObjects;
   sequence_skip::SequenceSkip sequenceSkip;
   StageWarp stageWarp;
+  coop::Coop coop;
 };
 
 Session &session(Core &core);

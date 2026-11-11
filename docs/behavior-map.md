@@ -3,23 +3,23 @@
 Durable ledger of SANCTIONED deviations from the byte-exact reference. Primary axis = GUEST-MEMORY AFFECT (how much canon guest state a deviation touches). One `## ` block per
 deviation, grouped by affect. `tools/behavior.py` = view · `... <words>` = search · `... check` = gate (a canon-affecting change must be comparison-suppressed).
 
-**By affect:** 3 full
-**By status:** 2 implemented · 1 planned
+**By affect:** 4 full
+**By status:** 4 implemented
 
 ---
 
-### **affect: full** — DELIBERATELY changes canon guest state. MUST be force-suppressed by the typed comparison-run role (`guard` required) so byte-compares stay clean by construction.
+### **affect: full** — DELIBERATELY changes canon guest state. MUST be force-suppressed under the typed comparison-run role (`guard` required) so byte-compares stay clean by construction.
 
 ## coop
 - **class:** pc_enh
 - **affect:** full
-- **status:** planned
-- **flag:** PSXPORT_X4_COOP (read via psx::config::enh(x4::coopCvar()); no reader yet)
+- **status:** implemented
+- **flag:** PSXPORT_X4_COOP (read via psx::config::enh(x4::coopCvar()) in x4::coop::Coop::tick and x4::Runtime::padPorts)
 - **original:** single player only: one player struct, one camera target, pad slot 0 routed to it
 - **altered:** a second player joins mid-play and controls the other hunter (P2 spawns as Zero when P1 is X)
 - **guard:** force-suppressed by psx::config::enh() in typed comparison runs; every read site calls it
-- **owner:** game/title/enhancements.cpp
-- **notes:** THE MOST INVASIVE pc_enh IN THE WORKSPACE. Its target is the PLAYER-OBJECT SYSTEM, not the renderer, and much of the layout is UNKNOWN — `docs/re-player-object.md` stops there deliberately. Both InitPAD buffers are measured and bound, so the host input destination exists; the game-side route and player-object half are supported by nothing. A comparison is meaningful only with this off: a clean compare with co-op requested means the suppression fired, not that co-op is correct. Its own evidence gate is an OPEN QUESTION and has deliberately not been invented.
+- **owner:** game/coop/ (knob in game/title/enhancements.cpp)
+- **notes:** Player 2 is a projected copy of the per-player blocks (`docs/plans/0046-drop-in-co-op.md`, `docs/re-player-object.md` §6). With nobody joined every co-op override runs only the retail body; a pad session through a build without the feature leaves the same guest RAM. A comparison is meaningful only with this off.
 
 ## fastwait
 - **class:** pc_enh
@@ -32,17 +32,6 @@ deviation, grouped by affect. `tools/behavior.py` = view · `... <words>` = sear
 - **owner:** game/media/fast_wait.{h,cpp} (per-Core synchronous load owner + scoped libcd leaves), game/execution/native_overrides.cpp (image-scoped issuer/leaf registration)
 - **notes:** USER directive 2026-08-24: "remove all loading screens, loading coro must be converted to single sync call". Archive handlers 0x800142BC/0x80014514 reject seven outstanding records; retail main calls consumer 0x80014780 once per loop, so the synchronous owner pumps it after every ready callback and requires processed/enqueued counters to match within the measured 16-slot ring. The native frame-loop migration now traps every guest VSync mode, including the former setup/query exceptions inside this route. The loader's non-VSync mechanics remain focused-test-covered, but it is not currently a working product claim until those calls move to direct native timing owners and a new launch verifies the combined route. This enhancement deliberately changes guest timing/state and makes no byte-exact claim.
 
-## widescreen
-- **class:** pc_enh
-- **affect:** full
-- **status:** implemented
-- **flag:** PSXPORT_X4_WIDESCREEN (read via psx::config::enh(x4::widescreenCvar()))
-- **original:** the guest sets up a 4:3 projection and renders the retail composition
-- **altered:** with the player's Aspect Ratio row on 16:9 or 21:9, the record path's canvas shows what the guest draws in the margin: extra background tile columns, objects the retail cull hides (drawn only, the retail on_screen byte stays what gameplay reads) and the HUD packets moved to their screen edge; the projection and draw environment stay retail
-- **guard:** force-suppressed by psx::config::enh() in typed comparison runs; every read site calls it
-- **owner:** game/widescreen/widescreen_controller.cpp, game/render/background_tiles.cpp, game/render/cull_overrides.cpp, game/render/hud_anchor.cpp
-- **notes:** The retail image has one global OFX/OFY/H setup at 160/120/512. On the record path the framework plan keeps OFX 160 and RECT.w 320 (the canvas adds 54 columns each side at 16:9), so the title's projection owner changes nothing the guest draws with. The aspect comes from the player's Aspect Ratio row (`Mods::aspect`, issue 0024); the flag only switches the enhancement off. Gameplay never sees the widening: the off-screen-verdict cull sites and the spawn strips stay retail, so objects spawn at the 4:3 edges and pop in inside the margin; the background margin reaches at most 5 tile columns per side (80 px), so 21:9 is capped. Guest 2D stays as drawn, centred. STR movies hold 4:3. Pixel verification is open: no 16-bit picture past boot is reachable (`docs/issues/0037`).
-
 ## skip
 - **class:** pc_enh
 - **affect:** full
@@ -53,3 +42,14 @@ deviation, grouped by affect. `tools/behavior.py` = view · `... <words>` = sear
 - **guard:** force-suppressed by psx::config::enh() in typed comparison runs, and the pad route override reads it before touching a guest word
 - **owner:** game/input/sequence_skip.cpp
 - **notes:** The end state is the one the retail route leaves: engine, misc, item and entity blocks were byte-identical to the Cross-tap route at the first controllable field of stage 1 (the player's animation counter differs by the sub-field alignment). Only the briefing is covered; the other sequences are listed in `docs/project-state.md` S011 as not done.
+
+## widescreen
+- **class:** pc_enh
+- **affect:** full
+- **status:** implemented
+- **flag:** PSXPORT_X4_WIDESCREEN (read via psx::config::enh(x4::widescreenCvar()))
+- **original:** the guest sets up a 4:3 projection and renders the retail composition
+- **altered:** with the player's Aspect Ratio row on 16:9 or 21:9, the record path's canvas shows what the guest draws in the margin: extra background tile columns, objects the retail cull hides (drawn only, the retail on_screen byte stays what gameplay reads) and the HUD packets moved to their screen edge; the projection and draw environment stay retail
+- **guard:** force-suppressed by psx::config::enh() in typed comparison runs; every read site calls it
+- **owner:** game/widescreen/widescreen_controller.cpp, game/render/background_tiles.cpp, game/render/cull_overrides.cpp, game/render/hud_anchor.cpp
+- **notes:** The retail image has one global OFX/OFY/H setup at 160/120/512. On the record path the framework plan keeps OFX 160 and RECT.w 320 (the canvas adds 54 columns each side at 16:9), so the title's projection owner changes nothing the guest draws with. The aspect comes from the player's Aspect Ratio row (`Mods::aspect`, issue 0024); the flag only switches the enhancement off. Gameplay never sees the widening: the off-screen-verdict cull sites and the spawn strips stay retail, so objects spawn at the 4:3 edges and pop in inside the margin; the background margin reaches at most 5 tile columns per side (80 px), so 21:9 is capped. Guest 2D stays as drawn, centred. STR movies hold 4:3. Pixel verification is open: no 16-bit picture past boot is reachable (`docs/issues/0037`).

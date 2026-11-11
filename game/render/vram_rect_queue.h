@@ -4,6 +4,8 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
+#include <vector>
 
 class Core;
 
@@ -124,6 +126,20 @@ constexpr std::uint32_t streamAddress(std::uint32_t blob, std::uint32_t animatio
   return blob + (animationWord & kStreamOffsetMask);
 }
 
+// One band of a graphic with `remaining` band units left (0x80015F74-0x80015FC4): a trailing band is 16 rows of
+// four halfwords per unit, a full one every whole 16-row unit at once.
+struct Band {
+  std::int16_t width;
+  std::int16_t height;
+  bool trailing;
+};
+constexpr Band band(std::int32_t remaining) {
+  const bool trailing = remaining < kBandHeight;
+  return {.width = static_cast<std::int16_t>(trailing ? remaining * 4 : kFullBandWidth),
+          .height = static_cast<std::int16_t>(trailing ? kBandHeight : (remaining & ~(kBandHeight - 1))),
+          .trailing = trailing};
+}
+
 // One append call, recorded for the census.
 struct Append {
   std::uint32_t field = 0;   // the guest's own field counter
@@ -152,6 +168,17 @@ struct RectOrigin {
 
 // One 16-pixel band per entry; reached from 17 guest call sites.
 void append(Core &core, std::uint32_t object, const RectOrigin &origin);
+
+// A graphic the appender decompressed but did not queue: the entries it would have appended at `origin`, with
+// pixels copied out of the guest buffer, which is left as it was.
+struct Graphic {
+  std::vector<Entry> entries; // `pixels` is a byte offset into `pixels`
+  std::vector<std::uint16_t> pixels;
+};
+
+// The appender's latch and decompression for an owner that uploads the result itself; nullopt when the animation
+// index is unchanged. The guest's queue, cursor and decompression buffer are not changed.
+std::optional<Graphic> decompress(Core &core, std::uint32_t object, const RectOrigin &origin);
 
 // Run census; `calls` includes calls that emitted nothing.
 struct Census {

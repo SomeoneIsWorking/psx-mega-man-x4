@@ -3,6 +3,7 @@ include(${PSXPORT_DIR}/cmake/psxport.cmake)
 # Include path shared by every first-party target.
 set(X4_TITLE_DIRS
   ${CMAKE_SOURCE_DIR}/game
+  ${CMAKE_SOURCE_DIR}/game/coop
   ${CMAKE_SOURCE_DIR}/game/debug
   ${CMAKE_SOURCE_DIR}/game/execution
   ${CMAKE_SOURCE_DIR}/game/frame
@@ -49,6 +50,9 @@ set(SEAM_SRC
   game/debug/debug_menu.cpp
   game/debug/stage_warp.cpp
   game/title/enhancements.cpp
+  game/coop/counterpart.cpp
+  game/coop/player_two.cpp
+  game/coop/coop.cpp
 )
 add_library(megamanx4_seam OBJECT ${SEAM_SRC})
 # C++20: enhancements.cpp uses psx::config::BoolVar, whose header needs it.

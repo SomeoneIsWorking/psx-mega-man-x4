@@ -150,3 +150,30 @@ which state function sets up each stage's pools; the checkpoint/respawn writer (
   have a byte-gate proving the substrate body it replaces matches. Nothing here imports one.
 - Co-op remains force-suppressed in typed comparison roles (`tools/behavior.py check`); the co-op
   evidence question is still OPEN and unchanged by this doc.
+
+## 6. What player 2 needs (co-op, `docs/plans/0046-drop-in-co-op.md`)
+
+Measured on our image 2026-11-11 (disassembly of `SLUS_005.61`, Ghidra C under `scratch/decomp/coop/`); the same
+addresses appear in MegaManX4Recomp's MIT co-op mod, which runs this build (`docs/prior-art.md`).
+
+- **Gameplay tick `0x80021158`** (engine state 6) calls, in order: `0x80035EF0` (pad words `0x80166C08/0A/0C` into
+  body `+0x7C/7E/80`, or into `g_Entity` when body `+0xDE` is set), `0x80021C14` (ride vehicle `0x80173A30`),
+  `0x800311EC` (player state table `0x80108980[+4]`), `0x80021340` (shots `0x801406F8`, 16 x `0x9C`), the world
+  pools `0x80021234`..`0x80021A20`, the spawn strip `0x80028E24`, `0x80021D20`, `0x8002C614(&g_Player)` (terrain),
+  the camera `0x80027850`, `0x80027D40`, `0x800281E8`, `0x80021B34`, `0x8002A484`, `0x80021D84` (charge glows
+  `0x8013E470`, 2 x `0x50`), `0x80021CC8` (dash trails `0x80141AB0`, 3 x `0x60`) and `0x80015ECC(&g_Player, 0x140,
+  0)` (the player's graphics into the VRAM queue).
+- **Player init `0x80035240`** reads the engine's character `0x80172203`, seeds the animation table (`0x80119DF0` X,
+  `0x8011AFF0` Zero) and the blobs from scratch `0x1F800014`/`0x1F80001C`, sets the tile word `+0x40 = 0x0500`
+  (texture page 5, VRAM x `0x140`) and CLUT `+0x42 = 0x7800` (row 480), and clears the three camera enable bytes
+  `0x801419F4/0x80141A48/0x80141A9C`. `0x800350A4(body, a1)` reloads the blobs, `0x80035EA4(body)` the collision box.
+- **Graphics**: a player graphic is at most `0x1000` bytes (one decompression slot, 64 halfwords x 32 rows), so
+  player 1 occupies tile rows 0-1 of page 5; the sprite builder `0x80024334` adds the tile word to each piece's tile
+  index, so a tile word of `0x0520` reads rows 2-3.
+- **Draw pass `0x80023DB8`**: HUD `0x80024E70`, OT bucket reset `0x800241E8`, the player (and `0x800257BC` armor
+  parts for X), `g_Entity`, X's glows, trails back to front, the pools, the vehicle.
+- **Hits**: `0x8002D9BC(enemy)` tests an enemy body against the player and its vehicle, returning 1 on a hit;
+  `0x8002DD04(enemy)` walks the shots against an enemy and returns the hit. Both read only the singletons.
+- **Camera follow**: `0x80027AAC` reads the player's x pixels `0x801418D2`, `0x80027A5C` the y pixels `0x801418D6`.
+- **Pad 2** is decoded every field into `0x80166D50/52/54` (held/previous/pressed), active high with the packet's
+  first button byte high: Start is `0x0800`.

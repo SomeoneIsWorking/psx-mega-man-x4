@@ -27,7 +27,7 @@ a human action at a live console after launch, later and more specific than the 
 | `PSXPORT_X4_DISC` | path (port fact, not a CVar) | — | — | `kTitleIdentity.discEnvVar` (`game/runtime/catalog.cpp`) | `tools/resolve_disc.py` host-side; the framework's disc resolver guest-side |
 | `PSXPORT_CARD` | path (port fact, not a CVar) | `scratch/saves/megamanx4.mcr` | — | `x4::Runtime::hostIdentity()` (`game/runtime/runtime.cpp`) | the framework's memory-card backend |
 | `PSXPORT_X4_WIDESCREEN` | Bool | `true` | yes | `x4::widescreenCvar()` | `psx::config::enh(widescreenCvar())` in game/widescreen/widescreen_controller.cpp |
-| `PSXPORT_X4_COOP` | Bool | `false` | yes | `x4::coopCvar()` | no reader yet; `x4::reportUnreadEnhancements()` says so each run |
+| `PSXPORT_X4_COOP` | Bool | `false` | yes | `x4::coopCvar()` | `x4::coop::Coop` (`game/coop/`): pad 2 Start joins and leaves player 2; `x4::Runtime::padPorts` gives two ports |
 | `PSXPORT_X4_SKIP` | Bool | `true` | yes | `x4::skipCvar()` | `psx::config::enh(skipCvar())` in game/input/sequence_skip_overrides.cpp (Start skips the Hunter H.Q. briefing) |
 | `PSXPORT_X4_FASTWAIT` | Bool | `true` | yes | `x4::fastWaitCvar()` | `psx::config::enh(fastWaitCvar())` in game/media/fast_wait.cpp (loading-coroutine conversion) |
 
@@ -72,13 +72,6 @@ role returns false with a per-knob Lucent warning, product mode honours the reso
 
 Each knob is registered in `docs/behavior-map.md` as `class: pc_enh` / `affect: full` with a `guard`
 citing that suppression; `tools/behavior.py check` fails an `affect: full` entry whose guard does not.
-
-## Declared knobs without a reader
-
-A registered CVar with no reader resolves silently and the exit audit reports `0 UNKNOWN`, so a clean
-run cannot tell the user that co-op does nothing. `x4::reportUnreadEnhancements()`, called from
-`x4::Runtime::registerOverrides`, logs one line per run naming every declared knob no feature reads yet
-(today `PSXPORT_X4_COOP`, RE-07). Remove a knob from that line in the commit that adds its first reader.
 
 Judge knobs on the exit `[cfg] env audit AT EXIT` line, never the startup audit: the startup audit runs
 before late subsystems have read anything.

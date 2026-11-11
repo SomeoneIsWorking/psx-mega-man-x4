@@ -2,9 +2,11 @@
 
 #include "background_overrides.h"
 #include "bios_threads.h"
+#include "coop.h"
 #include "crt0_boot.h"
 #include "cull_overrides.h"
 #include "display_init.h"
+#include "enhancement_gate.h"
 #include "enhancements.h"
 #include "frame/frame_driver.h"
 #include "gpu_timeout.h"
@@ -59,7 +61,6 @@ void Runtime::startProgram(Core &core) {
 }
 
 void Runtime::registerOverrides(Game &game) {
-  reportUnreadEnhancements();
   // vsync::serveVSync overrides the entry and answers VSync(<0) through this binding's counter.
   vsync_.bind(game);
   dmaCallbacks_.bind(game);
@@ -78,6 +79,7 @@ void Runtime::registerOverrides(Game &game) {
   background::registerOverrides(game.core);
   hud::registerOverrides(game.core);
   sequence_skip::registerOverrides(game.core);
+  coop::registerOverrides(game.core);
   native_overrides::install(game.core);
 }
 
@@ -98,6 +100,10 @@ std::unique_ptr<psx::game::FrameDriver> Runtime::createFrameDriver(Game &game) {
 
 void Runtime::deliverPad(Core &core, const psx::input::PadDelivery &delivery) {
   pad_.deliver(core, delivery);
+}
+
+std::uint32_t Runtime::padPorts() const {
+  return psx::config::enh(coopCvar()) ? psx::input::kPadPorts : 1u;
 }
 
 const psx::present::GuestWidescreenProjection *Runtime::guestWidescreenProjection() const {

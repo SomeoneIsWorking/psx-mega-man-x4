@@ -36,12 +36,14 @@ Frame loop: owned. `x4::frame::FrameDriver` runs one iteration of gameMain `0x80
 | `VisibilityCull`, `WidenedObjects` | `game/render/visibility_cull.*`, `widened_objects.*`, `cull_overrides.*` | Retail cull box and the margin objects lent `on_screen` for the draw pass only |
 | `WideBackground` | `game/render/background_tiles.*`, `background_overrides.*` | Margin tile columns from the layer cell ring |
 | `HudAnchor` | `game/render/hud_anchor.*`, `hud_overrides.*` | HUD packets moved to their screen edge |
-| `vram_rect` | `game/render/vram_rect_queue.*` | The eight-entry VRAM rectangle upload queue |
+| `vram_rect` | `game/render/vram_rect_queue.*` | The eight-entry VRAM rectangle upload queue; `decompress` for an owner that uploads a player graphic itself |
 | `title_quad` | `game/ui/title_quad.*` | The white quad behind the MEGAMAN logo |
 | `WidescreenPolicy`, `WidescreenController` | `game/widescreen/widescreen_controller.*` | Requested aspect and the per-Core projection plan and cull margin |
 | `StageWarp` | `game/debug/stage_warp.*` | The stage arrival through engine state 4, applied at a frame boundary |
+| `coop::Coop`, `coop::PlayerTwo` | `game/coop/coop.*`, `game/coop/player_two.*` | Drop-in player 2: pad-2 Start join/leave, the projected per-player blocks, player 2's tick pass, draw, VRAM upload, retried hits and the midpoint camera |
+| `coop::Counterpart` | `game/coop/counterpart.*` | The other hunter's archive and stage palette read from the disc, its members lent into the resident slots while player 2 is projected |
 | `PlayerLens`, `CameraLayerLens`, `PadLens` | `game/title/player_object.h` | Read-only views of the player, camera layer and pad structures |
-| `widescreenCvar`, `coopCvar`, `fastWaitCvar`, `skipCvar` | `game/title/enhancements.*` | The `pc_enh` knobs (`docs/config.md`) and the unread-knob line |
+| `widescreenCvar`, `coopCvar`, `fastWaitCvar`, `skipCvar` | `game/title/enhancements.*` | The `pc_enh` knobs (`docs/config.md`) |
 | launcher | `tools/run.py`, `tools/resolve_disc.py`, `tools/extract_exe.py` | Disc resolution, extraction and authentication for the zero-argument launch |
 | live driver | `tools/live_play.py`, `tools/title_prompts.py` | Headless control-channel input, front-end census, captures |
 | checks | `tools/behavior.py`, `check_license_containment.py`, `run_end.py` | Behaviour-map, AGPL containment scan, run-end report parsing |
@@ -56,5 +58,5 @@ Frame loop: owned. `x4::frame::FrameDriver` runs one iteration of gameMain `0x80
 - A widened draw → `game/render/`; the value gameplay reads stays retail.
 - A title knob → `game/title/enhancements.*`, `docs/config.md`, `docs/behavior-map.md`.
 - A debug route to a screen → `game/debug/`, declared in `x4::DebugMenu` (`game/debug/debug_menu.*`), applied by `x4::frame::FrameDriver`.
-- Co-op → new owners under `game/input/` over `player_object.h`, composed by `x4::Runtime`.
+- Co-op → `game/coop/`, its overrides installed from `x4::Runtime::registerOverrides`, its state in `x4::Session`.
 - Anything every title shares → psxport. AGPL-derived code stays here (`LICENSING.md`).

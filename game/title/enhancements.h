@@ -10,7 +10,4 @@ psx::config::Var<bool> &coopCvar();       // PSXPORT_X4_COOP
 psx::config::Var<bool> &fastWaitCvar();   // PSXPORT_X4_FASTWAIT
 psx::config::Var<bool> &skipCvar();       // PSXPORT_X4_SKIP
 
-// States the declared knobs no feature reads yet.
-void reportUnreadEnhancements();
-
 } // namespace x4

@@ -21,6 +21,8 @@ public:
   std::unique_ptr<psx::game::TitleSessionState> createSession(Game &game) override;
   std::unique_ptr<psx::game::FrameDriver> createFrameDriver(Game &game) override;
   void deliverPad(Core &core, const psx::input::PadDelivery &delivery) override;
+  // Two with co-op on: pad 2 joins and drives player 2.
+  std::uint32_t padPorts() const override;
   const psx::present::GuestWidescreenProjection *guestWidescreenProjection() const override;
   const psx::game::TitleDebugMenu &debugMenu() const override {
     return debugMenu_;

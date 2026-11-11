@@ -1,7 +1,5 @@
 #include "enhancements.h"
 
-#include <lucent/log.h>
-
 namespace x4 {
 
 // User preferences, so they persist in the settings file.
@@ -32,11 +30,6 @@ psx::config::Var<bool> &fastWaitCvar() {
 
 psx::config::Var<bool> &skipCvar() {
   return cv_skip;
-}
-
-// Co-op is declared for the settings file; its feature (RE-07) does not exist yet.
-void reportUnreadEnhancements() {
-  lucent::info("x4-enh", "{}={} is declared but no feature reads it yet (RE-07)", cv_coop.name(), cv_coop.get());
 }
 
 } // namespace x4

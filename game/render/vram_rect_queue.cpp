@@ -10,6 +10,8 @@
 #include <algorithm>
 #include <cstdint>
 #include <lucent/log.h>
+#include <optional>
+#include <vector>
 
 namespace x4::vram_rect {
 namespace {
@@ -19,8 +21,6 @@ std::uint32_t lastRefusalField = 0;
 std::uint32_t reportedField = 0;
 bool reportedThisField = false;
 
-// Band loop of 0x80015F74-0x80015FD4; the cursor advances in the delay slot at 0x80015FD4, so it moves
-// once per entry, not per call.
 // One decompressed graphic: its pixels, the rectangle origin and its band count.
 struct BandRun {
   std::uint32_t source;
@@ -28,28 +28,43 @@ struct BandRun {
   std::int32_t bands;
 };
 
-void emitBands(Core &core, const BandRun &run, Append &record) {
-  std::uint32_t cursor = core.mem_r32(kCursorGlobal);
+// The entries of one graphic in the appender's order; `emit` returns false to stop. Returns the band count the
+// last head read, which is v1 at loop exit (`sra` @ 0x80015F74).
+template <typename Emit> std::int32_t forEachEntry(const BandRun &run, Emit emit) {
   std::uint32_t source = run.source;
   std::int32_t remaining = run.bands;
   std::int32_t top = run.origin.y;
-  // v1 at loop exit is the band count the last head read (`sra` @ 0x80015F74).
   std::int32_t lastHeadCount = remaining;
   while (remaining != 0) {
     lastHeadCount = remaining;
+    const Band next = band(remaining);
+    const Entry entry{.rect = {.x = static_cast<std::int16_t>(run.origin.x),
+                               .y = static_cast<std::int16_t>(top),
+                               .w = next.width,
+                               .h = next.height},
+                      .pixels = source};
+    if (!emit(entry)) {
+      break;
+    }
+    if (next.trailing) {
+      remaining = 0;
+    } else {
+      top += next.height;
+      remaining -= next.height;
+      source += kFullBandSourceBytes;
+    }
+  }
+  return lastHeadCount;
+}
+
+void emitBands(Core &core, const BandRun &run, Append &record) {
+  std::uint32_t cursor = core.mem_r32(kCursorGlobal);
+  const std::int32_t lastHeadCount = forEachEntry(run, [&](const Entry &entry) {
     // The guest has no capacity test and the cursor is a guest-written global, so test membership.
     if (cursor < kQueueBase || cursor >= kQueueEnd) {
       record.refused += 1;
-      break;
+      return false;
     }
-    const bool trailing = remaining < kBandHeight;
-    const std::int32_t height = trailing ? kBandHeight : (remaining & ~(kBandHeight - 1));
-    Entry entry;
-    entry.rect.x = static_cast<std::int16_t>(run.origin.x);
-    entry.rect.y = static_cast<std::int16_t>(top);
-    entry.rect.w = static_cast<std::int16_t>(trailing ? remaining * 4 : kFullBandWidth);
-    entry.rect.h = static_cast<std::int16_t>(height);
-    entry.pixels = source;
     core.mem_w16(cursor + 0, static_cast<std::uint16_t>(entry.rect.x));
     core.mem_w16(cursor + 2, static_cast<std::uint16_t>(entry.rect.y));
     core.mem_w16(cursor + 4, static_cast<std::uint16_t>(entry.rect.w));
@@ -57,16 +72,10 @@ void emitBands(Core &core, const BandRun &run, Append &record) {
     core.mem_w32(cursor + 8, entry.pixels);
     record.emitted += 1;
     stats.emitted += 1;
-
-    if (trailing) {
-      remaining = 0;
-    } else {
-      top += height;
-      remaining -= height;
-      source += kFullBandSourceBytes;
-    }
+    // The cursor advances in the delay slot at 0x80015FD4, once per entry.
     cursor += kEntryStride;
-  }
+    return true;
+  });
 
   // Terminator `sw zero,8($5)` @ 0x80015FD8 at cursor + 8; skipped when it would leave the array.
   if (cursor >= kQueueBase && cursor + kEntryStride <= kQueueEnd) {
@@ -112,6 +121,28 @@ void runGuest(Core &core, const LeafCall &leaf) {
   core.r[31] = leaf.caller;
   psx::cpu::callGuestToReturnResuming(core, "vram_rect::flushRect", leaf.entry, leaf.returnPc);
   core.r[31] = savedLink;
+}
+
+// The latch @ 0x80015EE8-0x80015F04 and the decompression @ 0x80015F54; nullopt when the index is unchanged.
+std::optional<BandRun>
+latchAndDecompress(Core &core, std::uint32_t object, const RectOrigin &origin, std::uint32_t caller) {
+  // Unchanged animation index returns before decompressing; `sb` @ 0x80015F04 latches the new one.
+  const std::uint32_t current = core.mem_r8(object + kCurrentAnimOffset);
+  const std::uint32_t previous = core.mem_r8(object + kPreviousAnimOffset);
+  // The delay slot @ 0x80015EF8 is reloaded by the epilogue, so only the compared bytes survive.
+  core.r[kCurrentAnimRegister] = current;
+  core.r[kPreviousAnimRegister] = previous;
+  if (current == previous) {
+    return std::nullopt;
+  }
+  core.mem_w8(object + kPreviousAnimOffset, static_cast<std::uint8_t>(current));
+
+  const std::uint32_t blob = core.mem_r32(object + kBlobOffset);
+  const std::uint32_t word = core.mem_r32(blob + current * 4u);
+  const std::uint32_t buffer = decompressedBuffer(core, object);
+  // `jal 0x80016FF4` @ 0x80015F54, the only call to it; returns to 0x80015F5C.
+  runGuest(core, {kDecompressGfxGuest, kDecompressGfxReturn, streamAddress(blob, word), buffer, caller});
+  return BandRun{.source = buffer, .origin = origin, .bands = bandCount(word)};
 }
 
 } // namespace
@@ -164,27 +195,11 @@ void append(Core &core, std::uint32_t object, const RectOrigin &origin) {
   record.x = origin.x;
   record.y = origin.y;
 
-  // Unchanged animation index returns before decompressing; `sb` @ 0x80015F04 latches the new one.
-  const std::uint32_t current = core.mem_r8(object + kCurrentAnimOffset);
-  const std::uint32_t previous = core.mem_r8(object + kPreviousAnimOffset);
-  // The delay slot @ 0x80015EF8 is reloaded by the epilogue, so only the compared bytes survive.
-  core.r[kCurrentAnimRegister] = current;
-  core.r[kPreviousAnimRegister] = previous;
-  if (current == previous) {
+  const std::optional<BandRun> run = latchAndDecompress(core, object, origin, caller);
+  if (!run) {
     return;
   }
-  core.mem_w8(object + kPreviousAnimOffset, static_cast<std::uint8_t>(current));
-
-  const std::uint32_t blob = core.mem_r32(object + kBlobOffset);
-  const std::uint32_t word = core.mem_r32(blob + current * 4u);
-  const std::int32_t bands = bandCount(word);
-  const std::uint32_t stream = streamAddress(blob, word);
-  const std::uint32_t buffer = decompressedBuffer(core, object);
-
-  // `jal 0x80016FF4` @ 0x80015F54, the only call to it; returns to 0x80015F5C.
-  runGuest(core, {kDecompressGfxGuest, kDecompressGfxReturn, stream, buffer, caller});
-
-  emitBands(core, {.source = buffer, .origin = origin, .bands = bands}, record);
+  emitBands(core, *run, record);
 
   if (record.refused != 0u) {
     stats.refused += record.refused;
@@ -211,6 +226,30 @@ void append(Core &core, std::uint32_t object, const RectOrigin &origin) {
                    stats.emitted + stats.refused);
     }
   }
+}
+
+std::optional<Graphic> decompress(Core &core, std::uint32_t object, const RectOrigin &origin) {
+  const std::uint32_t buffer = decompressedBuffer(core, object);
+  std::vector<std::uint16_t> saved(kGfxBufferStride / 2u);
+  for (std::uint32_t index = 0; index < saved.size(); ++index) {
+    saved[index] = core.mem_r16(buffer + index * 2u);
+  }
+  const std::optional<BandRun> run = latchAndDecompress(core, object, origin, core.r[31]);
+  if (!run) {
+    return std::nullopt;
+  }
+  Graphic graphic;
+  graphic.pixels.resize(saved.size());
+  for (std::uint32_t index = 0; index < saved.size(); ++index) {
+    graphic.pixels[index] = core.mem_r16(buffer + index * 2u);
+    core.mem_w16(buffer + index * 2u, saved[index]);
+  }
+  forEachEntry(*run, [&](Entry entry) {
+    entry.pixels -= buffer;
+    graphic.entries.push_back(entry);
+    return true;
+  });
+  return graphic;
 }
 
 void install(Core &core) {
