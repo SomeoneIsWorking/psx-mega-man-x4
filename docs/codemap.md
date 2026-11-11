@@ -35,12 +35,13 @@ Frame loop: owned. `x4::frame::FrameDriver` runs one iteration of gameMain `0x80
 | `gpu_timeout` | `game/render/gpu_timeout.*` | `set_alarm` `0x800ECB38` from the native field counter |
 | `VisibilityCull`, `WidenedObjects` | `game/render/visibility_cull.*`, `widened_objects.*`, `cull_overrides.*` | Retail cull box and the margin objects lent `on_screen` for the draw pass only |
 | `WideBackground` | `game/render/background_tiles.*`, `background_overrides.*` | Margin tile columns from the layer cell ring |
-| `HudAnchor` | `game/render/hud_anchor.*`, `hud_overrides.*` | HUD packets moved to their screen edge |
+| `HudAnchor` | `game/render/hud_anchor.*`, `hud_overrides.*` | The HUD pass: the retail HUD, player 2's gauge, then every packet moved to its screen edge |
 | `vram_rect` | `game/render/vram_rect_queue.*` | The eight-entry VRAM rectangle upload queue; `decompress` for an owner that uploads a player graphic itself |
 | `title_quad` | `game/ui/title_quad.*` | The white quad behind the MEGAMAN logo |
 | `WidescreenPolicy`, `WidescreenController` | `game/widescreen/widescreen_controller.*` | Requested aspect and the per-Core projection plan and cull margin |
 | `StageWarp` | `game/debug/stage_warp.*` | The stage arrival through engine state 4, applied at a frame boundary |
 | `coop::Coop`, `coop::PlayerTwo` | `game/coop/coop.*`, `game/coop/player_two.*` | Drop-in player 2: pad-2 Start join/leave, the projected per-player blocks, player 2's tick pass, draw, VRAM upload, retried hits and the midpoint camera |
+| `coop::PlayerTwoHud` | `game/coop/player_two_hud.*` | Player 2's gauge: the retail HUD pieces' packets moved under player 1's, their tiles copied from the counterpart's UI texture |
 | `coop::Counterpart` | `game/coop/counterpart.*` | The other hunter's archive and stage palette read from the disc, its members lent into the resident slots while player 2 is projected |
 | `PlayerLens`, `CameraLayerLens`, `PadLens` | `game/title/player_object.h` | Read-only views of the player, camera layer and pad structures |
 | `widescreenCvar`, `coopCvar`, `fastWaitCvar`, `skipCvar` | `game/title/enhancements.*` | The `pc_enh` knobs (`docs/config.md`) |

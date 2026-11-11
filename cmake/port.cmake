@@ -53,6 +53,7 @@ set(SEAM_SRC
   game/coop/counterpart.cpp
   game/coop/player_two.cpp
   game/coop/coop.cpp
+  game/coop/player_two_hud.cpp
 )
 add_library(megamanx4_seam OBJECT ${SEAM_SRC})
 # C++20: enhancements.cpp uses psx::config::BoolVar, whose header needs it.

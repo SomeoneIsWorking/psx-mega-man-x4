@@ -102,8 +102,12 @@ void Runtime::deliverPad(Core &core, const psx::input::PadDelivery &delivery) {
   pad_.deliver(core, delivery);
 }
 
+std::span<const psx::game::TitleIntSetting> Runtime::titleIntSettings() const {
+  return x4::titleIntSettings();
+}
+
 std::uint32_t Runtime::padPorts() const {
-  return psx::config::enh(coopCvar()) ? psx::input::kPadPorts : 1u;
+  return coopOn() ? psx::input::kPadPorts : 1u;
 }
 
 const psx::present::GuestWidescreenProjection *Runtime::guestWidescreenProjection() const {

@@ -36,6 +36,20 @@ DebugMenu::DebugMenu() {
             return StageWarp::stageRunning(core) ? std::string() : "a warp is legal only while a stage is running";
           },
   });
+  verb({
+      .name = "coop-life",
+      .summary = "Set player 2's life",
+      .params = {psx::game::DebugParam::integer("life", 0, 0x7F)},
+      .run =
+          [](const psx::game::DebugCall &call) {
+            call.reply = session(call.core).coop.setLife(static_cast<std::uint8_t>(call.values.u32(0)));
+          },
+      .refusal =
+          [](Core &core) {
+            return session(core).coop.seat() == coop::Seat::Playing ? std::string() : "player 2 is not playing";
+          },
+      .inMenu = false,
+  });
 }
 
 } // namespace x4

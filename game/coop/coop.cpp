@@ -61,6 +61,27 @@ constexpr std::uint32_t kShotStride = 0x9Cu;
 constexpr std::uint32_t kCharacterOffset = 0x02u; // 0 X
 // Pixels apart the two players may drift, a screen less a margin; outward steps past it are undone.
 constexpr std::int32_t kLeash = 240;
+// Body bytes the retail scripts set while they steer player 1: a script action (0x80036AE4) and a boss door.
+constexpr std::uint32_t kScriptAction = 0xC0u;
+constexpr std::uint32_t kDoorAction = 0xC4u;
+constexpr std::uint32_t kGroundFlags = 0x89u;
+constexpr std::uint8_t kOnGround = 0x08u;
+// Engine bytes a stage end and a scene set.
+constexpr std::uint32_t kEngineStageEnd = StageWarp::kStageEndOffset;
+constexpr std::uint32_t kEngineSceneEnd = 0x10u;
+// Player 1's steering sub-states: past the spawn seeding, before the special moves.
+constexpr std::uint8_t kFirstSteeringSubState = 2u;
+constexpr std::uint8_t kLastSteeringSubState = 0x0Fu;
+// Fields the retail death state runs before player 2 is withdrawn, and a withdrawn player waits to return.
+constexpr std::uint32_t kDeathFields = 120u;
+constexpr std::uint32_t kReturnFields = 60u;
+// Camera layer 0 (0x801419B0) scroll pixels, and how far outside the 320 x 240 view player 2 may stand.
+constexpr std::uint32_t kCameraX = 0x801419BAu;
+constexpr std::uint32_t kCameraY = 0x801419BEu;
+constexpr std::int32_t kViewWidth = 320;
+constexpr std::int32_t kViewHeight = 240;
+constexpr std::int32_t kViewMargin = 64;
+constexpr std::uint32_t kOffViewFields = 60u;
 
 // A retail function called from an override; it returns to the override's own link.
 struct GuestCall {
@@ -80,10 +101,21 @@ bool pressedStart(Core &core) {
   return (core.mem_r16(guest::kPadPressedP2) & kStartButton) != 0u;
 }
 
-bool canJoin(Core &core) {
+// Player 1 plays the stage itself: no load, script, door, death or stage end owns it.
+bool freePlay(Core &core) {
   return core.mem_r8(StageWarp::kEngine + StageWarp::kStateOffset) == StageWarp::kInStage &&
          core.mem_r8(StageWarp::kEngine + StageWarp::kSubStateOffset) == StageWarp::kPlaying &&
-         core.mem_r8(kPlayer) != 0u && core.mem_r8(kPlayer + kState) == kControlState;
+         core.mem_r8(StageWarp::kEngine + kEngineStageEnd) == 0u &&
+         core.mem_r8(StageWarp::kEngine + kEngineSceneEnd) == 0u && core.mem_r8(kPlayer) != 0u &&
+         core.mem_r8(kPlayer + kState) == kControlState && core.mem_r8(kPlayer + kScriptAction) == 0u &&
+         core.mem_r8(kPlayer + kDoorAction) == 0u;
+}
+
+// Free play with player 1 standing, so player 2 can be placed on the same floor.
+bool canPlace(Core &core) {
+  const std::uint8_t subState = core.mem_r8(kPlayer + kSubState);
+  return freePlay(core) && (core.mem_r8(kPlayer + kGroundFlags) & kOnGround) != 0u &&
+         subState >= kFirstSteeringSubState && subState <= kLastSteeringSubState;
 }
 
 std::array<std::uint8_t, kEngineBytes> captureEngine(Core &core) {
@@ -145,59 +177,128 @@ private:
 
 void Coop::tick(Core &core) {
   const std::uint32_t link = core.r[31];
-  if (psx::config::enh(coopCvar()) && pressedStart(core)) {
-    if (joined_) {
+  if ((seat_ != Seat::Absent || joinRequested_) && !coopOn()) {
+    joinRequested_ = false;
+    leave("co-op was switched off");
+  } else if (coopOn() && pressedStart(core)) {
+    if (seat_ != Seat::Absent) {
       leave("pad 2 pressed Start");
-    } else if (canJoin(core)) {
-      join(core, link);
+    } else {
+      // A join waits for player 1 to stand in free play.
+      joinRequested_ = !joinRequested_;
     }
   }
+  if (joinRequested_ && seat_ == Seat::Absent && canPlace(core)) {
+    joinRequested_ = false;
+    join(core, link);
+  }
   psx::cpu::callOriginalResumingToReturn(core, "coop::tick original", kGameplayTick, link);
-  if (joined_) {
+  ++seatFields_;
+  switch (seat_) {
+  case Seat::Absent:
+    break;
+  case Seat::Playing:
+    if (!freePlay(core)) {
+      withdraw("player 1 left free play", false);
+      break;
+    }
     pass(core, link);
+    if (!two_.alive()) {
+      lucent::info("x4-coop", "player 2 died at x={} y={}", two_.body16(kXPixels), two_.body16(kYPixels));
+      enter(Seat::Dying);
+    } else if (offView(core)) {
+      if (seatFields_ >= kOffViewFields) {
+        withdraw("player 2 was out of view", false);
+      }
+    } else {
+      seatFields_ = 0;
+    }
+    break;
+  case Seat::Dying:
+    pass(core, link);
+    if (seatFields_ >= kDeathFields) {
+      withdraw("player 2's death sequence ended", true);
+    }
+    break;
+  case Seat::Withdrawn:
+    if (seatFields_ >= kReturnFields && canPlace(core) && spawn(core, link, {.offsetX = 0, .first = false})) {
+      lucent::info("x4-coop", "player 2 returned at x={} y={}", two_.body16(kXPixels), two_.body16(kYPixels));
+      enter(Seat::Playing);
+    }
+    break;
   }
   core.r[31] = link;
 }
 
-void Coop::join(Core &core, std::uint32_t link) {
-  const std::uint32_t x = core.mem_r32(kPlayer + kXPos);
-  const std::uint32_t y = core.mem_r32(kPlayer + kYPos);
+void Coop::enter(Seat seat) {
+  seat_ = seat;
+  seatFields_ = 0;
+}
+
+bool Coop::loadCounterpart(Core &core) {
   const std::uint8_t character = core.mem_r8(StageWarp::kEngine + kEngineCharacter);
-  const std::array<std::uint8_t, kEngineBytes> engine = captureEngine(core);
-  std::array<std::uint8_t, kCameraEnables.size()> cameraEnabled{};
-  for (std::size_t index = 0; index < kCameraEnables.size(); ++index) {
-    cameraEnabled[index] = core.mem_r8(kCameraEnables[index]);
-  }
   if (character > 1u) {
     lucent::warn("x4-coop", "player 1 is character {}; only X and Zero have a counterpart", character);
-    return;
+    return false;
   }
-  const std::uint8_t other = character ^ 1u;
-  const std::optional<std::string> refusal =
-      counterpart_.load(core,
-                        character,
-                        other,
-                        core.mem_r8(StageWarp::kEngine + StageWarp::kStageOffset),
-                        core.mem_r8(StageWarp::kEngine + StageWarp::kPartOffset));
-  if (refusal) {
-    lucent::warn("x4-coop", "player 2 cannot join: {}", *refusal);
-    return;
+  const Counterpart::Identity identity{.resident = character,
+                                       .stage = core.mem_r8(StageWarp::kEngine + StageWarp::kStageOffset),
+                                       .section = core.mem_r8(StageWarp::kEngine + StageWarp::kPartOffset)};
+  if (counterpart_.identity() != identity) {
+    const std::optional<std::string> refusal =
+        counterpart_.load(core, identity.resident, identity.resident ^ 1u, identity.stage, identity.section);
+    if (refusal) {
+      lucent::warn("x4-coop", "player 2 cannot join: {}", *refusal);
+      return false;
+    }
   }
+  // A stage load may have reused player 2's CLUT rows and HUD tiles.
   const std::vector<std::uint8_t> &palette = counterpart_.palette();
   std::vector<std::uint16_t> clut(palette.size() / 2u);
   std::memcpy(clut.data(), palette.data(), palette.size());
   core.gpuDevice().loadImage({.x = 0, .y = kCharacterClutRow + kClutRows, .width = kClutWidth, .height = kClutRows},
                              clut,
                              core.owners.port(psx::present::WriterKind::LoadImage));
-  const std::uint32_t spawnX = x + (static_cast<std::uint32_t>(kSpawnOffset) << 16);
+  hud_.forget();
+  return true;
+}
+
+void Coop::join(Core &core, std::uint32_t link) {
   two_.clear();
+  fullLifeOnReturn_ = true;
+  if (!spawn(core, link, {.offsetX = kSpawnOffset, .first = true})) {
+    return;
+  }
+  enter(Seat::Playing);
+  lucent::info("x4-coop",
+               "player 2 joined at x={} y={} as character {}",
+               two_.body16(kXPixels),
+               two_.body16(kYPixels),
+               core.mem_r8(StageWarp::kEngine + kEngineCharacter) ^ 1u);
+}
+
+bool Coop::spawn(Core &core, std::uint32_t link, Placement placement) {
+  if (!loadCounterpart(core)) {
+    return false;
+  }
+  const std::uint32_t x = core.mem_r32(kPlayer + kXPos);
+  const std::uint32_t y = core.mem_r32(kPlayer + kYPos);
+  const std::uint8_t other = core.mem_r8(StageWarp::kEngine + kEngineCharacter) ^ 1u;
+  const std::array<std::uint8_t, kEngineBytes> engine = captureEngine(core);
+  std::array<std::uint8_t, kCameraEnables.size()> cameraEnabled{};
+  for (std::size_t index = 0; index < kCameraEnables.size(); ++index) {
+    cameraEnabled[index] = core.mem_r8(kCameraEnables[index]);
+  }
+  const std::uint32_t spawnX = x + (static_cast<std::uint32_t>(placement.offsetX) << 16);
   {
     const Projection projection(*this, core, true);
     core.mem_w8(StageWarp::kEngine + kEngineCharacter, other);
     core.mem_w8(StageWarp::kEngine + kEngineMarker, 0u);
-    // Player 2 starts at full life with the weapons player 1's campaign holds.
-    core.mem_w8(StageWarp::kEngine + kEngineLife, engine[kEngineMaxLife]);
-    for (std::uint32_t weapon = 0; weapon < kEngineWeaponCount; ++weapon) {
+    if (fullLifeOnReturn_) {
+      core.mem_w8(StageWarp::kEngine + kEngineLife, engine[kEngineMaxLife]);
+    }
+    // A first join starts with the weapons player 1's campaign holds.
+    for (std::uint32_t weapon = 0; placement.first && weapon < kEngineWeaponCount; ++weapon) {
       core.mem_w8(StageWarp::kEngine + kEngineWeaponEnergy + weapon, engine[kEngineWeaponEnergy + weapon]);
     }
     call(core, {kPlayerInit}, link);
@@ -221,15 +322,28 @@ void Coop::join(Core &core, std::uint32_t link) {
   for (std::size_t index = 0; index < kCameraEnables.size(); ++index) {
     core.mem_w8(kCameraEnables[index], cameraEnabled[index]);
   }
-  joined_ = true;
-  lucent::info(
-      "x4-coop", "player 2 joined at x={} y={} as character {}", two_.body16(kXPixels), two_.body16(kYPixels), other);
+  fullLifeOnReturn_ = false;
+  return true;
 }
 
 void Coop::leave(const char *why) {
-  joined_ = false;
+  enter(Seat::Absent);
   lucent::info("x4-coop", "player 2 left: {}", why);
   two_.clear();
+}
+
+void Coop::withdraw(const char *why, bool fullLife) {
+  fullLifeOnReturn_ = fullLifeOnReturn_ || fullLife;
+  if (seat_ != Seat::Withdrawn) {
+    lucent::info("x4-coop", "player 2 withdrawn: {}", why);
+  }
+  enter(Seat::Withdrawn);
+}
+
+bool Coop::offView(Core &core) const {
+  const std::int32_t x = two_.body16(kXPixels) - static_cast<std::int16_t>(core.mem_r16(kCameraX));
+  const std::int32_t y = two_.body16(kYPixels) - static_cast<std::int16_t>(core.mem_r16(kCameraY));
+  return x < -kViewMargin || x > kViewWidth + kViewMargin || y < -kViewMargin || y > kViewHeight + kViewMargin;
 }
 
 void Coop::pass(Core &core, std::uint32_t link) {
@@ -257,6 +371,8 @@ void Coop::pass(Core &core, std::uint32_t link) {
     core.r[31] = link;
   }
   writePad(core, guest::kPadHeldP1, padOne);
+  // The engine is player 1's: player 2's own bytes were swapped out above, the rest it may not change.
+  restoreEngine(core, engine);
   core.mem_w8(kDirtyByte, dirty);
   lucent::debug("x4-coop",
                 "player 2 x={} y={} state={}/{} on-screen={} animation={} life={}",
@@ -267,11 +383,6 @@ void Coop::pass(Core &core, std::uint32_t link) {
                 two_.body8(kOnScreen),
                 two_.body8(vram_rect::kCurrentAnimOffset),
                 two_.body8(kLife));
-  if (!two_.alive()) {
-    // Player 2's death sequence would drive the one engine; it is not run (plan follow-up).
-    restoreEngine(core, engine);
-    leave("player 2 has no life left");
-  }
 }
 
 void Coop::uploadGraphics(Core &core) {
@@ -329,8 +440,8 @@ void Coop::uploadGraphics(Core &core) {
 
 void Coop::playerInit(Core &core) {
   const std::uint32_t link = core.r[31];
-  if (joined_ && !projected_) {
-    leave("player 1 was spawned again");
+  if (seat_ != Seat::Absent && !projected_) {
+    withdraw("player 1 was spawned again", true);
   }
   psx::cpu::callOriginalResumingToReturn(core, "coop::playerInit original", kPlayerInit, link);
 }
@@ -339,11 +450,8 @@ void Coop::drawRemapped(Core &core, std::uint32_t object, std::uint32_t link) {
   const std::uint16_t tile = core.mem_r16(object + kTileWord);
   const std::uint16_t clut = core.mem_r16(object + kClutWord);
   const bool playerTiles = (tile >> 8) == kPlayerTilePage && (tile & 0xFFu) < kTileRowsShift;
-  const std::int32_t clutRow = (clut >> 6) & 0x1FF;
-  const bool characterClut =
-      (clut & 0x8000u) == 0u && clutRow >= kCharacterClutRow && clutRow < kCharacterClutRow + kClutRows;
   core.mem_w16(object + kTileWord, playerTiles ? static_cast<std::uint16_t>(tile + kTileRowsShift) : tile);
-  core.mem_w16(object + kClutWord, characterClut ? static_cast<std::uint16_t>(clut + kClutRowsShift) : clut);
+  core.mem_w16(object + kClutWord, playerTwoClut(clut));
   call(core, {kSpriteBuilder, object}, link);
   core.mem_w16(object + kTileWord, tile);
   core.mem_w16(object + kClutWord, clut);
@@ -352,7 +460,7 @@ void Coop::drawRemapped(Core &core, std::uint32_t object, std::uint32_t link) {
 void Coop::drawPlayerTwo(Core &core) {
   const std::uint32_t link = core.r[31];
   psx::cpu::callOriginalResumingToReturn(core, "coop::otReset original", kOtReset, link);
-  if (!joined_) {
+  if (seat_ != Seat::Playing && seat_ != Seat::Dying) {
     return;
   }
   {
@@ -393,7 +501,7 @@ void Coop::retryHit(Core &core, std::uint32_t entry) {
   const std::uint32_t link = core.r[31];
   const std::uint32_t enemy = core.r[4];
   psx::cpu::callOriginalResumingToReturn(core, "coop::hit original", entry, link);
-  if (!joined_ || projected_ || core.r[2] != 0u || !two_.alive()) {
+  if (seat_ != Seat::Playing || projected_ || core.r[2] != 0u || !two_.alive()) {
     return;
   }
   const Projection projection(*this, core, false);
@@ -406,7 +514,7 @@ void Coop::follow(Core &core, const FollowAxis &axis) {
   const std::uint32_t entry = axis.entry;
   const std::uint32_t pixels = axis.pixels;
   const std::uint32_t link = core.r[31];
-  if (!joined_ || projected_ || !two_.alive()) {
+  if (seat_ != Seat::Playing || projected_ || !two_.alive()) {
     psx::cpu::callOriginalResumingToReturn(core, "coop::follow original", entry, link);
     return;
   }
@@ -415,6 +523,34 @@ void Coop::follow(Core &core, const FollowAxis &axis) {
   core.mem_w16(kPlayer + pixels, static_cast<std::uint16_t>(midpoint));
   psx::cpu::callOriginalResumingToReturn(core, "coop::follow midpoint", entry, link);
   core.mem_w16(kPlayer + pixels, own);
+}
+
+std::string Coop::setLife(std::uint8_t life) {
+  if (seat_ != Seat::Playing) {
+    return "player 2 is not playing";
+  }
+  two_.setLife(life);
+  return lucent::format("player 2's life is {}", life);
+}
+
+void Coop::drawHud(Core &core) {
+  if ((seat_ != Seat::Playing && seat_ != Seat::Dying) || core.mem_r8(StageWarp::kEngine + kEngineHudShown) == 0u) {
+    return;
+  }
+  const std::uint32_t link = core.r[31];
+  const HudArenas before = hudArenas(core);
+  const std::uint32_t frame = kGaugeFirstFrame + (core.mem_r8(StageWarp::kEngine + kEngineMaxLife) - kBaseMaxLife) / 2u;
+  {
+    const Projection projection(*this, core, true);
+    call(core, {kLifeBar, kPlayer, 0u}, link);
+    call(core,
+         {kHudSprite, kLivesGroup, (core.mem_r8(StageWarp::kEngine + kEngineLives) + kFirstDigitFrame) & 0xFFu},
+         link);
+    call(core, {kHudSprite, kGaugeGroup, frame}, link);
+    call(core, {core.mem_r8(kPlayer + kCharacterOffset) == 0u ? kXWeaponGauge : kZeroGauge, kPlayer}, link);
+  }
+  hud_.place(core, counterpart_, before);
+  core.r[31] = link;
 }
 
 void registerOverrides(Core &core) {

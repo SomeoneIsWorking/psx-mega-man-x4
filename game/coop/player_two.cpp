@@ -59,6 +59,10 @@ std::int16_t PlayerTwo::body16(std::uint32_t offset) const {
   return static_cast<std::int16_t>(bytes_[offset] | (bytes_[offset + 1] << 8));
 }
 
+void PlayerTwo::setLife(std::uint8_t life) {
+  bytes_[kLife] = static_cast<std::uint8_t>((bytes_[kLife] & 0x80u) | (life & 0x7Fu));
+}
+
 bool PlayerTwo::alive() const {
   return body8(0) != 0u && (body8(kLife) & 0x7Fu) != 0u && body8(kState) < kFirstDeadState;
 }

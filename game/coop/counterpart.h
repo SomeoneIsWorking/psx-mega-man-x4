@@ -32,6 +32,16 @@ inline constexpr std::uint32_t kBodyScratchWord = 0x1F800014u;
 inline constexpr std::uint32_t kPaletteMember = 0u;
 inline constexpr std::uint32_t kPaletteType = 5u;
 inline constexpr std::uint32_t kPaletteBytes = 0x1000u;
+// The HUD and menu texture (member 1): 55 strips of 64 x 16 halfwords filling VRAM x 320-1023, y 176-255 column by
+// column (layout type 6 of the table at 0x800F1614).
+inline constexpr std::uint32_t kUiMember = 1u;
+inline constexpr std::uint32_t kUiType = 0x10206u;
+inline constexpr std::int32_t kUiLeft = 320;
+inline constexpr std::int32_t kUiTop = 176;
+inline constexpr std::int32_t kUiStripWidth = 64;
+inline constexpr std::int32_t kUiStripRows = 16;
+inline constexpr std::int32_t kUiStripsPerColumn = 5;
+inline constexpr std::uint32_t kUiStrips = 55u;
 
 class Counterpart final {
 public:
@@ -62,12 +72,27 @@ public:
   const std::vector<std::uint8_t> &palette() const {
     return palette_;
   }
+  // The counterpart's UI texture halfword at VRAM (x, y), or nullopt outside its rectangle.
+  std::optional<std::uint16_t> uiPixel(std::int32_t x, std::int32_t y) const;
+
+  // What was loaded, so a stage or section change loads again.
+  struct Identity {
+    std::uint8_t resident;
+    std::uint8_t stage;
+    std::uint8_t section;
+    bool operator==(const Identity &) const = default;
+  };
+  const std::optional<Identity> &identity() const {
+    return identity_;
+  }
 
 private:
   std::array<std::vector<std::uint8_t>, kLentMembers.size()> lent_;
   std::vector<std::uint8_t> residentBody_;
   std::vector<std::uint8_t> body_;
   std::vector<std::uint8_t> palette_;
+  std::vector<std::uint8_t> ui_;
+  std::optional<Identity> identity_;
   bool loaded_ = false;
 };
 

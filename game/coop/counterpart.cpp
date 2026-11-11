@@ -67,6 +67,7 @@ std::vector<std::uint8_t> copy(std::span<const std::uint8_t> bytes) {
 std::optional<std::string>
 Counterpart::load(Core &core, std::uint8_t resident, std::uint8_t other, std::uint8_t stage, std::uint8_t section) {
   loaded_ = false;
+  identity_.reset();
   psx::cd::Disc &disc = core.game->disc;
   std::vector<std::uint8_t> residentFile;
   std::vector<std::uint8_t> otherFile;
@@ -104,9 +105,15 @@ Counterpart::load(Core &core, std::uint8_t resident, std::uint8_t other, std::ui
     }
     lent_[index] = copy(lent);
   }
+  if (kUiMember >= otherMembers->size() || (*otherMembers)[kUiMember].type != kUiType ||
+      (*otherMembers)[kUiMember].bytes.size() != kUiStrips * kArcSector) {
+    return lucent::format("{} member {} is not the {}-strip UI texture", otherPath, kUiMember, kUiStrips);
+  }
+  ui_ = copy((*otherMembers)[kUiMember].bytes);
   residentBody_ = copy((*residentMembers)[kBodyMember].bytes);
   body_ = copy((*otherMembers)[kBodyMember].bytes);
   palette_ = copy((*paletteMembers)[kPaletteMember].bytes);
+  identity_ = Identity{.resident = resident, .stage = stage, .section = section};
   loaded_ = true;
   return std::nullopt;
 }
@@ -121,6 +128,20 @@ void Counterpart::exchange(Core &core) {
     core.mem_write(address, lent, psx::cpu::ExecutableWriteSource::Native);
     std::memcpy(lent.data(), guest.data(), lent.size());
   }
+}
+
+// The strip order is MegaManX4Recomp's `retain_ui` (layout 2: each column from y 176 to 240).
+std::optional<std::uint16_t> Counterpart::uiPixel(std::int32_t x, std::int32_t y) const {
+  const std::int32_t column = (x - kUiLeft) / kUiStripWidth;
+  const std::int32_t strip = column * kUiStripsPerColumn + (y - kUiTop) / kUiStripRows;
+  if (x < kUiLeft || y < kUiTop || strip >= static_cast<std::int32_t>(kUiStrips) ||
+      y >= kUiTop + kUiStripsPerColumn * kUiStripRows) {
+    return std::nullopt;
+  }
+  const std::size_t offset =
+      static_cast<std::size_t>(strip) * kArcSector +
+      static_cast<std::size_t>(((y - kUiTop) % kUiStripRows) * kUiStripWidth + (x - kUiLeft) % kUiStripWidth) * 2u;
+  return static_cast<std::uint16_t>(ui_[offset] | (ui_[offset + 1u] << 8));
 }
 
 std::optional<std::uint32_t> Counterpart::residentTable(std::uint32_t blobOffset) const {

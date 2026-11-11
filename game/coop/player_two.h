@@ -69,6 +69,7 @@ public:
   std::uint8_t body8(std::uint32_t offset) const;
   std::int16_t body16(std::uint32_t offset) const;
   bool alive() const;
+  void setLife(std::uint8_t life);
 
 private:
   std::vector<std::uint8_t> bytes_;

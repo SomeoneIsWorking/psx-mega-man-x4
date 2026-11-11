@@ -158,7 +158,8 @@ addresses appear in MegaManX4Recomp's MIT co-op mod, which runs this build (`doc
 
 - **Gameplay tick `0x80021158`** (engine state 6) calls, in order: `0x80035EF0` (pad words `0x80166C08/0A/0C` into
   body `+0x7C/7E/80`, or into `g_Entity` when body `+0xDE` is set), `0x80021C14` (ride vehicle `0x80173A30`),
-  `0x800311EC` (player state table `0x80108980[+4]`), `0x80021340` (shots `0x801406F8`, 16 x `0x9C`), the world
+  `0x800311EC` (player state table `0x800F8980[+4]`: 0 spawn `0x80035694`, 1 control `0x800312B4`, 2 death
+  `0x80035A6C`, 3 and up scripted), `0x80021340` (shots `0x801406F8`, 16 x `0x9C`), the world
   pools `0x80021234`..`0x80021A20`, the spawn strip `0x80028E24`, `0x80021D20`, `0x8002C614(&g_Player)` (terrain),
   the camera `0x80027850`, `0x80027D40`, `0x800281E8`, `0x80021B34`, `0x8002A484`, `0x80021D84` (charge glows
   `0x8013E470`, 2 x `0x50`), `0x80021CC8` (dash trails `0x80141AB0`, 3 x `0x60`) and `0x80015ECC(&g_Player, 0x140,
@@ -177,3 +178,17 @@ addresses appear in MegaManX4Recomp's MIT co-op mod, which runs this build (`doc
 - **Camera follow**: `0x80027AAC` reads the player's x pixels `0x801418D2`, `0x80027A5C` the y pixels `0x801418D6`.
 - **Pad 2** is decoded every field into `0x80166D50/52/54` (held/previous/pressed), active high with the packet's
   first button byte high: Start is `0x0800`.
+- **Free play**: retail scripts steer the player through body `+0xC0` (script action, `0x80036AE4`) and `+0xC4`
+  (boss door), and a stage end sets engine `+0x0F`; MegaManX4Recomp gates its partner on these and on
+  `+0x89 & 8` (standing) with sub-state `2..0x0F`. The death state runs 121 fields for player 2 in the intro stage.
+- **HUD pass `0x80024E70`** (when engine `+0x1F` is set): `0x800253F0(body, 0)` the life bar (flat `POLY_F4` from
+  `0x80025588`, positions at `0x800F3124`), `0x80025188(1, lives + 0x3B)` the lives digit, `0x80025188(0, 0x45 +
+  (max life - 32) / 2)` the gauge frame, then `0x80024F5C(body)` for X or `0x8002509C(body)` for Zero, and the boss
+  gauge. `0x80025188(group, frame)` draws an assembly frame (scratch `0x1F80001C`, member 9) as `SPRT_16`s at the
+  group's position and CLUT (`0x800F30F4`, 6 bytes each; `0x7841`/`0x7801`, rows 481/480), one `0xE1` draw mode
+  each; a piece's tile `idx` is page `5 + idx / 80`, v `0xB0 + (idx % 80) / 16 * 16`. Packets go to the scratchpad
+  arenas `0x1F800108` (sprites, 16 bytes), `0x1F80010C` (draw modes, 8) and `0x1F800110` (bars, 24).
+- **UI texture**: character archive member 1 (type `0x10206`, 55 strips of 64 x 16 halfwords) fills VRAM x 320-1023,
+  y 176-255 column by column (layout table `0x800F1614`, type 6 at (320, 176)); X's and Zero's differ in 365 of
+  their 880 4-bit tiles, and both gauge frames use the same tile indices. Page 5 rows 64-175 (VRAM x 320-383) were
+  empty in the intro stage and Web Spider apart from player 2's HUD tiles.

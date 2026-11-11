@@ -102,14 +102,29 @@ updates once; what changes is admission and presentation:
   both views, computed identically on both peers, so the simulation never depends on which peer is local; only the
   pane each peer presents differs.
 
-## Follow-ups after phase 1 (not in the first landing)
+## Phase 1b — a stage end to end
 
-- Player 2's life gauge (MegaManX4Recomp stacks it 104 px under player 1's) and character portrait.
-- Death: player 2 at zero HP is removed today; the retail death sequence, shared retries and a team wipe.
-- Stage exits, checkpoints, section transitions and respawn (`engine_obj_checkpoint` `0x801721DD`).
-- Bosses, boss doors and their camera locks; cutscenes and scripted scenes (one event owner, the partner held).
+Player 2 has a seat (`x4::coop::Seat`): absent, playing, dying or withdrawn. It plays only while player 1 is in
+free play (engine 6/0, no stage end, player 1 in the control state with no script action `+0xC0` or boss door
+`+0xC4`); otherwise it is withdrawn: kept, not updated, drawn or hit. It returns beside player 1 once player 1 stands
+in free play again, after 60 fields, through the same player-init placement as a join, at full life after its own
+death or player 1's respawn. That one rule covers doors, boss intros and victories, cutscenes, stage exits,
+checkpoint respawns and stage loads: the retail scripts steer player 1 alone and player 2 rejoins it. A player 2
+out of view for 60 fields is withdrawn and returns the same way. Its death runs the retail death state
+`0x80035A6C` for 120 fields with the engine block restored after each pass, so it cannot end the stage. A stage or
+section change loads that stage's counterpart palette again. Its gauge is the retail HUD pieces drawn with it
+projected, 104 px under player 1's (MegaManX4Recomp's layout), its tiles copied from the counterpart's UI texture
+into page 5 rows 64-175. The knob is a settings-menu row.
+
+## Follow-ups (not done)
+
+- Doors, bosses and cutscenes are covered by the withdraw rule but not yet shown in frames: no warp reaches a
+  boss door or a scripted scene. The retail boss AI still targets player 1 only, and boss contact runs through
+  boss-specific collision that only player 1 tests (MegaManX4Recomp hooks `0x80052218`, `0x80072240`, `0x80085F8C`,
+  `0x80088D30`).
 - Ride Armor and Ride Chasers; pause menus per player; sub-tanks and pickups ownership; weapon-get.
-- Player 2's sound bank (the counterpart's voice and saber sounds live in its archive's VAB).
+- Player 2's sound bank: Zero's voice and saber sounds live in its archive's VAB (members 10-13); player 2 plays
+  the resident character's.
 - Player 2 in a Zero campaign (X as player 2) is designed the same way; the first landing is proven in X's.
 - Pad 2 in `.pad` recording and replay (port 2 is live-only in phase 1).
 
@@ -119,3 +134,6 @@ updates once; what changes is admission and presentation:
   to psxport's input netplay owner (coordinator, 2026-11-11).
 - 2026-11-11: phase 1 first landing in the intro stage: join/leave on pad 2 Start, Zero walks, jumps, attacks and
   takes hits with his own tiles and stage palette, camera follows the midpoint; nobody-joined parity holds.
+- 2026-11-11: phase 1b: seats, free-play withdraw and return, player 2's death sequence and return, player 1's
+  respawn, stage and section loads (Web Spider parts 0 and 1), player 2's gauge, the settings-menu row; parity
+  against the same build with the knob off is byte-identical.

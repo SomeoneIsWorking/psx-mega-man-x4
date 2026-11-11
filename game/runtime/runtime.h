@@ -23,6 +23,7 @@ public:
   void deliverPad(Core &core, const psx::input::PadDelivery &delivery) override;
   // Two with co-op on: pad 2 joins and drives player 2.
   std::uint32_t padPorts() const override;
+  std::span<const psx::game::TitleIntSetting> titleIntSettings() const override;
   const psx::present::GuestWidescreenProjection *guestWidescreenProjection() const override;
   const psx::game::TitleDebugMenu &debugMenu() const override {
     return debugMenu_;

@@ -27,7 +27,7 @@ a human action at a live console after launch, later and more specific than the 
 | `PSXPORT_X4_DISC` | path (port fact, not a CVar) | — | — | `kTitleIdentity.discEnvVar` (`game/runtime/catalog.cpp`) | `tools/resolve_disc.py` host-side; the framework's disc resolver guest-side |
 | `PSXPORT_CARD` | path (port fact, not a CVar) | `scratch/saves/megamanx4.mcr` | — | `x4::Runtime::hostIdentity()` (`game/runtime/runtime.cpp`) | the framework's memory-card backend |
 | `PSXPORT_X4_WIDESCREEN` | Bool | `true` | yes | `x4::widescreenCvar()` | `psx::config::enh(widescreenCvar())` in game/widescreen/widescreen_controller.cpp |
-| `PSXPORT_X4_COOP` | Bool | `false` | yes | `x4::coopCvar()` | `x4::coop::Coop` (`game/coop/`): pad 2 Start joins and leaves player 2; `x4::Runtime::padPorts` gives two ports |
+| `PSXPORT_X4_COOP` | Int (0 off, 1 on) | `0` | yes | `x4::coopOn()` (`enh_int`) | `x4::coop::Coop` (`game/coop/`): pad 2 Start joins and leaves player 2; `x4::Runtime::padPorts` gives two ports; the settings menu row "Co-op (Start on pad 2)" (`x4::titleIntSettings`) |
 | `PSXPORT_X4_SKIP` | Bool | `true` | yes | `x4::skipCvar()` | `psx::config::enh(skipCvar())` in game/input/sequence_skip_overrides.cpp (Start skips the Hunter H.Q. briefing) |
 | `PSXPORT_X4_FASTWAIT` | Bool | `true` | yes | `x4::fastWaitCvar()` | `psx::config::enh(fastWaitCvar())` in game/media/fast_wait.cpp (loading-coroutine conversion) |
 

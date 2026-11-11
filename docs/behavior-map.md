@@ -14,12 +14,12 @@ deviation, grouped by affect. `tools/behavior.py` = view · `... <words>` = sear
 - **class:** pc_enh
 - **affect:** full
 - **status:** implemented
-- **flag:** PSXPORT_X4_COOP (read via psx::config::enh(x4::coopCvar()) in x4::coop::Coop::tick and x4::Runtime::padPorts)
+- **flag:** PSXPORT_X4_COOP (read via x4::coopOn(), psx::config::enh_int, in x4::coop::Coop::tick and x4::Runtime::padPorts; the settings menu row "Co-op (Start on pad 2)")
 - **original:** single player only: one player struct, one camera target, pad slot 0 routed to it
-- **altered:** a second player joins mid-play and controls the other hunter (P2 spawns as Zero when P1 is X)
-- **guard:** force-suppressed by psx::config::enh() in typed comparison runs; every read site calls it
-- **owner:** game/coop/ (knob in game/title/enhancements.cpp)
-- **notes:** Player 2 is a projected copy of the per-player blocks (`docs/plans/0046-drop-in-co-op.md`, `docs/re-player-object.md` §6). With nobody joined every co-op override runs only the retail body; a pad session through a build without the feature leaves the same guest RAM. A comparison is meaningful only with this off.
+- **altered:** a second player joins mid-play as the other hunter (Zero when player 1 is X) with its own gauge under player 1's; it plays only while player 1 is in free play, is withdrawn through scripts, doors, deaths and stage loads, and rejoins beside player 1; its own death runs the retail death state and it returns at full life
+- **guard:** force-suppressed by psx::config::enh_int() in typed comparison runs; every read site calls coopOn()
+- **owner:** game/coop/ (knob and menu row in game/title/enhancements.cpp; gauge composed by game/render/hud_overrides.cpp)
+- **notes:** Player 2 is a projected copy of the per-player blocks (`docs/plans/0046-drop-in-co-op.md`, `docs/re-player-object.md` §6); the engine block is restored after each of its passes. With nobody joined every co-op override runs only the retail body; a pad session leaves guest RAM byte-identical to the same build with the knob off. A comparison is meaningful only with this off.
 
 ## fastwait
 - **class:** pc_enh
