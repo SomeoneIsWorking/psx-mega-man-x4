@@ -106,3 +106,47 @@ packets move by `s - (scroll_l(v) - scroll_l(x))` where `v` is the clamped camer
 rule from its mode function (`kCameraModeFnTable` 0x800F3134; layer 2 is mode 4) recovered, not a measured ratio.
 A layer past its map end then shows retail's own wrap (`FUN_80027344`: a block below `+0x4D` maps to
 `+0x4E`'s side and back).
+
+Framework defect under the split (2026-11-13, reproduced on HEAD): report `-154132`'s pad at judgement settings
+(`scratch/bugs-1112/fw/head`), frames 3935-3936 and 3939-3945 showed the 4:3 window with black margins (left 21,
+right 87 columns). psxport keyed canvases on `(left, right)`, so every split change recreated them black, and the
+split was read from live guest state at present time: X4 builds its ordering table in frame N, `DrawOTag`s it in
+N+1's prefix and seals it in N+2's field, so the latched split was a frame newer than the picture. Fixed in psxport
+`58032b9c` (each `FrameRecord` carries the margins it drew; canvases are allocated at a 2M reach per side and keep the
+window of the record that last drew them; titles answer `GuestWidescreenProjection::pictureBeyondBuffer` and
+`present::fitMargins` makes the split) and here in `664af43` (`WidescreenController::submitFrame` at the frame
+prefix's `DrawOTag`). After: no black column in any of those frames (`fw/head_3935.png` before, `fw/t0_3935.png`
+after); Tomba 2 warp 13/0 and Spyro 1 warp 0/1/0 still render both margins (`fw/tomba2_13_0.png`,
+`fw/spyro1_0_1_0.png`).
+
+Host view camera (2026-11-13, RE in `scratch/bugs-1112/re/modes`):
+- Layer 1 and 2 scroll x is a pure function of layer 0's x per mode (tables `0x800F3140`, `0x800F3164`, the same
+  rules for both): 1 and 4 `x >> 1`, 2 `x`, 3 `x >> 2`, 6 `(x >> 1) + (x >> 2)`, 7 `x + (x >> 2)`, 8 `x + (x >> 1)`,
+  plus the stage's `+0x40`; 5 (`FUN_800285E0`) leaves the layer to its owner. Stage 0 picks mode 2 / 4
+  (`D_800F32D4`). The layer is then slew-limited against last frame's value (`FUN_80027FA8`/`FUN_80028450`: 16 px
+  per frame, a jump past 0x148 folds by 0x140). That binds only on a camera jump; the shift
+  `layerShift = s - (scroll(x + s) - scroll(x))` uses the pure part, which the limiter's state cancels in.
+- Bounds: rooms set the target window `+0x24..+0x2A`; `FUN_80028690` walks the active window `+0x1C..+0x22` toward it
+  at `+0x47` (2) per frame when it tightens on the camera and lets it go at once when it relaxes. The view therefore
+  follows the camera's clamp at once, and after a relaxation returns at `+0x47` per frame beyond the camera's own
+  motion, never against it (`view_bounds::nextView`).
+- Loops: `FUN_8002771C` starts every layer on the whole map (`+0x4D` 0, `+0x4E` row blocks - 1); only stage objects
+  (`FUN_800D8684`, `FUN_800D9268`, `FUN_800D9B48`, `FUN_800DA2D4`, `FUN_800DA8B4`) set other loop blocks, and
+  `FUN_80027344` wraps a block past them into the loop (moving the layer's scroll by the span when it leaves it). A
+  layer on its default blocks does not loop and limits the picture; a looping layer's margin reads the wrapped column.
+
+Proof (`fw/t1`, `fw/t1b/view.txt`, same pad, every frame 3920-4000 and 3050-3068): no black column in any frame. The
+view offset is 11 at camera x 43 and falls 2 per frame to 0 at x 55, then stays 0 (`view.txt`). Canvas motion: 0
+through 3945 (view at the left bound), floor 1 / sky 0 for 3946-3973, floor 2 / sky 1 for 3974-3999 (`fw/t1_3930.png`,
+`t1_3950.png`, `t1_3985.png`). In 3946-3973 the picture's left side grows one column per frame (16 -> 54) because
+stage 0's far layer (mode 4, default loop blocks) runs out of map, so in view coordinates the floor moves 2 and the sky
+1 per frame, steady. The walk-left section stays at the bound (0 / 0).
+
+Still open:
+- Pillarbox placement: `fitPicture` centres a narrower picture, so while a non-looping layer's map edge limits the
+  picture the whole picture drifts on the sink by half the limit's change (0.5 column per frame in 3946-3973). The
+  proper fix is an in-place pillarbox: the record carries both the view window (from the split) and the drawn window,
+  the presenter places the view window and leaves the undrawn columns black. Not built yet.
+- Objects bound to layer 1/2 (`VisibilityCull::layerFor`) are not moved with their layer yet; their draw needs an owner
+  that moves their packets by `layerShift` (cull follows once draw does).
+- Report 5/10 part-0 checkpoint warp and the 1,000-sprite arena (reports 6, 8) not started.

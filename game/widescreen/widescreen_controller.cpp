@@ -1,6 +1,8 @@
 #include "widescreen_controller.h"
 
+#include "camera_layers.h"
 #include "core.h"
+#include "debug/stage_warp.h"
 #include "enhancement_gate.h"
 #include "enhancements.h"
 #include "game.h"
@@ -99,11 +101,32 @@ psx::present::HorizontalMargins WidescreenController::margins(Core &core) const 
   if (!plan_.widescreen()) {
     return {};
   }
-  return psx::present::fitMargins(view_bounds::pictureBeyond(core), plan_.presentationHorizontalMargin);
+  (void)core;
+  return psx::present::fitMargins(view_.picture, plan_.presentationHorizontalMargin);
+}
+
+void WidescreenController::stepView(Core &core) {
+  view_ = view_bounds::nextView(core, view_, plan_.widescreen() ? plan_.presentationHorizontalMargin : 0);
+  lucent::debug("x4-view",
+                "camera x {} offset {} picture {}/{} shifts {}/{}",
+                view_.cameraX,
+                view_.offset,
+                view_.picture.left,
+                view_.picture.right,
+                layerShift(core, 1),
+                layerShift(core, 2));
+}
+
+int WidescreenController::layerShift(Core &core, int layer) const {
+  return camera_layers::layerShift(core, layer, view_.offset);
 }
 
 void WidescreenController::submitFrame(Core &core) {
-  submitted_ = view_bounds::pictureBeyond(core);
+  // Outside a stage no camera layer runs, so the view returns to the camera here.
+  if (core.mem_r8(StageWarp::kEngine + StageWarp::kStateOffset) != StageWarp::kInStage) {
+    view_ = {};
+  }
+  submitted_ = view_.picture;
 }
 
 void WidescreenController::synchronizePresentation(Core &core) {

@@ -23,6 +23,7 @@
 #include "stream_interrupt.h"
 #include "stream_startup.h"
 #include "title_quad.h"
+#include "view_overrides.h"
 #include "vram_rect_queue.h"
 #include "vsync_sync.h"
 
@@ -82,6 +83,7 @@ void Runtime::registerOverrides(Game &game) {
   title_quad::registerOverride(game.core);
   cull::registerOverrides(game.core);
   activity::registerOverrides(game.core);
+  view_bounds::registerOverrides(game.core);
   background::registerOverrides(game.core);
   hud::registerOverrides(game.core);
   sequence_skip::registerOverrides(game.core);

@@ -5,6 +5,7 @@
 
 #include "guest_widescreen_projection.h"
 
+#include <array>
 #include <cstdint>
 
 class Core;
@@ -66,17 +67,26 @@ struct MarginColumns {
 // Columns whose sprites reach [-left, 320 + right) for this scroll; both sides share the ring's spare columns.
 MarginColumns marginColumns(int scrollX, psx::present::HorizontalMargins margins);
 
+// Columns each layer's picture moves under the view camera (WidescreenController::layerShift), layer 0's always 0.
+using LayerShifts = std::array<int, 3>;
+
 class WideBackground {
 public:
-  explicit WideBackground(psx::present::HorizontalMargins margins) : margins_(margins) {}
+  WideBackground(psx::present::HorizontalMargins margins, const LayerShifts &shifts)
+      : margins_(margins), shifts_(shifts) {}
 
-  // Writes the margin columns of the three layers' rings from their block maps (0 outside the map).
+  // Writes the margin columns of the three layers' rings from their block maps: a looping layer wraps as
+  // FUN_80027344 does, any other is 0 off its map (the view's picture stops there).
   void refillRing(Core &core) const;
-  // Links the margin columns' sprites after the retail window of `layer` has been drawn.
-  void drawLayer(Core &core, int layer) const;
+  // After the retail window of `layer` linked sprites from `firstRetailSprite` on: moves them by the layer's shift
+  // and links the margin columns its shifted window leaves.
+  void drawLayer(Core &core, int layer, std::uint32_t firstRetailSprite) const;
 
 private:
+  psx::present::HorizontalMargins layerMargins(int layer) const;
+
   psx::present::HorizontalMargins margins_;
+  LayerShifts shifts_;
 };
 
 } // namespace x4::background

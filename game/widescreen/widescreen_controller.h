@@ -1,6 +1,7 @@
 #pragma once
 
 #include "guest_widescreen_projection.h"
+#include "view_bounds.h"
 
 class Core;
 
@@ -31,7 +32,11 @@ public:
   }
   // The picture columns each side of the frame being drawn; its record is sealed with the same split.
   psx::present::HorizontalMargins margins(Core &core) const;
-  // The frame's ordering table went to the GPU, drawn at the view the camera still holds.
+  // The camera layers moved (after FUN_800281E8): the view of the frame now being drawn.
+  void stepView(Core &core);
+  // Columns layer `layer`'s retail packets and objects move in the frame being drawn (camera_layers::layerShift).
+  int layerShift(Core &core, int layer) const;
+  // The frame's ordering table went to the GPU; its record is sealed with this frame's view.
   void submitFrame(Core &core);
   // The picture beyond the buffer of the frame last submitted.
   psx::present::HorizontalMargins submittedPicture() const {
@@ -42,6 +47,7 @@ private:
   ProjectionLatch latch_;
   psx::present::GuestProjectionPlan plan_;
   bool projectionPublished_ = false;
+  view_bounds::View view_;
   psx::present::HorizontalMargins submitted_{psx::present::kUnboundedPicture, psx::present::kUnboundedPicture};
 };
 

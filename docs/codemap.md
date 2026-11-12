@@ -34,9 +34,10 @@ Frame loop: owned. `x4::frame::FrameDriver` runs one iteration of gameMain `0x80
 | `display_init` | `game/render/display_init.*` | The two retail draw environments without the nested VSync |
 | `gpu_timeout` | `game/render/gpu_timeout.*` | `set_alarm` `0x800ECB38` from the native field counter |
 | `activity` | `game/widescreen/activity_window.*` | Placement strips, whole-view scan and lifetime checks widened by the presented margins (gameplay change) |
-| `view_bounds` | `game/widescreen/view_bounds.*` | Picture each side of the 4:3 window the camera bounds and layer maps can fill (`pictureBeyond`); the split is `psx::present::fitMargins` |
+| `view_bounds` | `game/widescreen/view_bounds.*`, `view_overrides.*` | The host view camera, stepped after `FUN_800281E8`: the split from layer 0's clamp window, returning at `+0x47` per frame after a bound relaxes; non-looping layers' maps limit the picture; `psx::present::fitMargins` makes the split |
+| `camera_layers` | `game/widescreen/camera_layers.*` | Layer 1/2 scroll rules from the mode tables `0x800F3140`/`0x800F3164` (`layerShift`), loop blocks `+0x4D..+0x4E` and `FUN_80027344`'s wrap |
 | `VisibilityCull`, `WidenedObjects` | `game/render/visibility_cull.*`, `widened_objects.*`, `cull_overrides.*` | Retail cull box and the margin objects lent `on_screen` for the draw pass only |
-| `WideBackground` | `game/render/background_tiles.*`, `background_overrides.*` | Margin tile columns from the layer cell ring |
+| `WideBackground` | `game/render/background_tiles.*`, `background_overrides.*` | Each layer's retail sprites moved by its view shift and the margin tile columns from the layer cell ring |
 | `HudAnchor` | `game/render/hud_anchor.*`, `hud_overrides.*` | The HUD pass: the retail HUD, player 2's gauge, then every packet moved to its screen edge |
 | `vram_rect` | `game/render/vram_rect_queue.*` | The eight-entry VRAM rectangle upload queue; `decompress` for an owner that uploads a player graphic itself |
 | `title_quad` | `game/ui/title_quad.*` | The white quad behind the MEGAMAN logo |

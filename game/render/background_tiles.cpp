@@ -2,6 +2,7 @@
 // background_tiles.cpp - margin columns of the SLUS_005.61 background tile layers; knows nothing of the guest ABI.
 #include "background_tiles.h"
 
+#include "camera_layers.h"
 #include "core.h"
 #include "player_object.h"
 
@@ -122,10 +123,16 @@ MarginColumns marginColumns(int scrollX, psx::present::HorizontalMargins margins
   return {left, std::min(right, RetailWindow::kSpareColumns - left)};
 }
 
+psx::present::HorizontalMargins WideBackground::layerMargins(int layer) const {
+  const int shift = shifts_[static_cast<std::size_t>(layer)];
+  return {margins_.left + shift, margins_.right - shift};
+}
+
 void WideBackground::refillRing(Core &core) const {
   for (int layer = 0; layer < guest::kCameraLayerCount; ++layer) {
     const LayerView view = readLayer(core, layer);
-    const MarginColumns columns = marginColumns(view.scrollX, margins_);
+    const MarginColumns columns = marginColumns(view.scrollX, layerMargins(layer));
+    const bool loops = camera_layers::loops(core, layer);
     if (columns.total() == 0 || view.scrollY < 0) {
       continue;
     }
@@ -137,25 +144,33 @@ void WideBackground::refillRing(Core &core) const {
           continue;
         }
         const int column = first + offset;
-        const std::uint16_t cell = view.contains(column, row) ? mapTile(core, layer, column, row) : std::uint16_t{0};
+        const int mapColumn = loops ? camera_layers::wrappedColumn(core, layer, column) : column;
+        const std::uint16_t cell =
+            view.contains(mapColumn, row) ? mapTile(core, layer, mapColumn, row) : std::uint16_t{0};
         core.mem_w16(ringCell(layer, row, column), cell);
       }
     }
   }
 }
 
-void WideBackground::drawLayer(Core &core, int layer) const {
+void WideBackground::drawLayer(Core &core, int layer, std::uint32_t firstRetailSprite) const {
+  const int shift = shifts_[static_cast<std::size_t>(layer)];
+  std::uint32_t sprite = core.mem_r32(kSpriteCursor);
+  if (shift != 0) {
+    for (std::uint32_t retail = firstRetailSprite; retail < sprite; retail += 16u) {
+      core.mem_w16(retail + 8u, static_cast<std::uint16_t>(core.mem_r16s(retail + 8u) + shift));
+    }
+  }
   const LayerView view = readLayer(core, layer);
-  const MarginColumns columns = marginColumns(view.scrollX, margins_);
+  const MarginColumns columns = marginColumns(view.scrollX, layerMargins(layer));
   if (columns.total() == 0 || view.scrollY < 0) {
     return;
   }
   const std::uint32_t limit = RetailWindow::kSpriteCap - static_cast<std::uint32_t>(reservedSprites(core, layer));
-  std::uint32_t sprite = core.mem_r32(kSpriteCursor);
   std::uint32_t count = core.mem_r32(kSpriteCount);
   const int first = view.firstColumn();
   const int top = view.firstRow();
-  const int originX = -(view.scrollX & kTileMask);
+  const int originX = shift - (view.scrollX & kTileMask);
   const int originY = -(view.scrollY & kTileMask);
   for (int row = 0; row < RetailWindow::kRows; ++row) {
     for (int offset = -columns.left; offset < columns.right + RetailWindow::kColumns; ++offset) {
