@@ -37,7 +37,10 @@ constexpr std::uint32_t kDrawEnvOffset = 20u;
 constexpr std::uint32_t kOrderingTableClearOffset = 112u;
 constexpr std::uint32_t kOrderingTableDrawOffset = 156u;
 
-bool runRetailFramePrefix(Core &core, guest::Dispatch dispatch, music_stream::State &musicStream) {
+bool runRetailFramePrefix(Core &core,
+                          guest::Dispatch dispatch,
+                          FrameSubmit submitFrame,
+                          music_stream::State &musicStream) {
   if (musicStream.pending()) {
     if (!musicStream.dispatchBeforeObjectsB(dispatch)) {
       return false;
@@ -54,6 +57,7 @@ bool runRetailFramePrefix(Core &core, guest::Dispatch dispatch, music_stream::St
     drawInfo = core.mem_r32(kCurrentDrawInfo);
     core.r[4] = drawInfo + kOrderingTableDrawOffset;
     guest::call(core, dispatch, {kDrawOTag, 0x80012080u, 4u});
+    submitFrame(core);
 
     const std::uint32_t drawInfoPosition = core.mem_r32(kScratchDrawInfoPosition) ^ 1u;
     drawInfo = kDrawInfos + drawInfoPosition * kDrawInfoStride;
@@ -115,7 +119,8 @@ FrameDriver::FrameDriver(guest::Dispatch dispatch,
                          bios_threads::Service &tasks,
                          StageWarp &stageWarp)
     : dispatch_(dispatch), fieldService_(fields.deliverField), presentationSync_(fields.synchronizePresentation),
-      movieCleanup_(&movieCleanup), musicStream_(&musicStream), tasks_(&tasks), stageWarp_(&stageWarp) {}
+      submitFrame_(fields.submitFrame), movieCleanup_(&movieCleanup), musicStream_(&musicStream), tasks_(&tasks),
+      stageWarp_(&stageWarp) {}
 
 void FrameDriver::stepFrame(Core &core, std::uint32_t frame) {
   const bool resumingMusicField = musicStream_->pending();
@@ -149,7 +154,7 @@ void FrameDriver::stepFrame(Core &core, std::uint32_t frame) {
   // While the movie call is suspended in UpdateTasks, the 16-bit draw prefix must not rerun;
   // it overwrites the 24-bit MDEC buffer. Resume only the blocked task.
   if (!movieCleanup_->ownsPicture() && !resumingTaskFrame) {
-    if (!runRetailFramePrefix(core, dispatch_, *musicStream_)) {
+    if (!runRetailFramePrefix(core, dispatch_, submitFrame_, *musicStream_)) {
       return;
     }
   }

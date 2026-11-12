@@ -33,8 +33,8 @@ psx::present::PresentationAspect WidescreenPolicy::presentationAspect(const Core
   return psx::present::GuestWidescreenProjection::presentationAspect(core);
 }
 
-psx::present::HorizontalMargins WidescreenPolicy::presentedMargins(Core &core, int margin) const {
-  return view_bounds::fillableMargins(core, margin);
+psx::present::HorizontalMargins WidescreenPolicy::pictureBeyondBuffer(Core &core) const {
+  return session(core).widescreen.submittedPicture();
 }
 
 WidescreenController::WidescreenController() : WidescreenController(psx::present::latchGuestProjection) {}
@@ -99,8 +99,11 @@ psx::present::HorizontalMargins WidescreenController::margins(Core &core) const 
   if (!plan_.widescreen()) {
     return {};
   }
-  const int margin = plan_.presentationHorizontalMargin;
-  return psx::present::clampedMargins(view_bounds::fillableMargins(core, margin), margin);
+  return psx::present::fitMargins(view_bounds::pictureBeyond(core), plan_.presentationHorizontalMargin);
+}
+
+void WidescreenController::submitFrame(Core &core) {
+  submitted_ = view_bounds::pictureBeyond(core);
 }
 
 void WidescreenController::synchronizePresentation(Core &core) {

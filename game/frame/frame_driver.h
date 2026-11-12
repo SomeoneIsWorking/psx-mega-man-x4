@@ -19,11 +19,14 @@ namespace cleanup = x4::movie_cleanup;
 
 using FieldService = void (*)(Core &);
 using PresentationSync = void (*)(Core &);
+using FrameSubmit = void (*)(Core &);
 
-// The host's field delivery and the title's presentation sync, both run once per frame.
+// The host's field delivery and the title's presentation sync, both run once per frame, and the title's note that
+// the frame's ordering table went to the GPU.
 struct FieldServices {
   FieldService deliverField;
   PresentationSync synchronizePresentation;
+  FrameSubmit submitFrame;
 };
 
 // Run the finite prefix of retail gameMain 0x80012024; the frame shell then repeats via x4::frame::FrameDriver.
@@ -45,6 +48,7 @@ private:
   guest::Dispatch dispatch_;
   FieldService fieldService_;
   PresentationSync presentationSync_;
+  FrameSubmit submitFrame_;
   cleanup::State *movieCleanup_;
   music::State *musicStream_;
   bios_threads::Service *tasks_;

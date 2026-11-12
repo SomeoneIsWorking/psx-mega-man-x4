@@ -34,7 +34,7 @@ Frame loop: owned. `x4::frame::FrameDriver` runs one iteration of gameMain `0x80
 | `display_init` | `game/render/display_init.*` | The two retail draw environments without the nested VSync |
 | `gpu_timeout` | `game/render/gpu_timeout.*` | `set_alarm` `0x800ECB38` from the native field counter |
 | `activity` | `game/widescreen/activity_window.*` | Placement strips, whole-view scan and lifetime checks widened by the presented margins (gameplay change) |
-| `view_bounds` | `game/widescreen/view_bounds.*` | Picture columns each side the camera bounds and layer maps can fill (`presentedMargins`) |
+| `view_bounds` | `game/widescreen/view_bounds.*` | Picture each side of the 4:3 window the camera bounds and layer maps can fill (`pictureBeyond`); the split is `psx::present::fitMargins` |
 | `VisibilityCull`, `WidenedObjects` | `game/render/visibility_cull.*`, `widened_objects.*`, `cull_overrides.*` | Retail cull box and the margin objects lent `on_screen` for the draw pass only |
 | `WideBackground` | `game/render/background_tiles.*`, `background_overrides.*` | Margin tile columns from the layer cell ring |
 | `HudAnchor` | `game/render/hud_anchor.*`, `hud_overrides.*` | The HUD pass: the retail HUD, player 2's gauge, then every packet moved to its screen edge |

@@ -14,9 +14,9 @@ constexpr int kScreenWidth = 320;
 
 } // namespace
 
-psx::present::HorizontalMargins fillableMargins(Core &core, int margin) {
-  if (margin <= 0 || core.mem_r8(StageWarp::kEngine + StageWarp::kStateOffset) != StageWarp::kInStage) {
-    return {margin, margin};
+psx::present::HorizontalMargins pictureBeyond(Core &core) {
+  if (core.mem_r8(StageWarp::kEngine + StageWarp::kStateOffset) != StageWarp::kInStage) {
+    return {psx::present::kUnboundedPicture, psx::present::kUnboundedPicture};
   }
   using Offsets = guest::CameraLayerOffsets;
   const std::uint32_t camera = guest::kCameraLayersAddress;
@@ -34,12 +34,7 @@ psx::present::HorizontalMargins fillableMargins(Core &core, int margin) {
     leftRoom = std::min(leftRoom, scroll);
     rightRoom = std::min(rightRoom, mapWidth - kScreenWidth - scroll);
   }
-  leftRoom = std::max(0, leftRoom);
-  rightRoom = std::max(0, rightRoom);
-  int left = std::min(margin, leftRoom);
-  int right = std::min(2 * margin - left, rightRoom);
-  left = std::min(2 * margin - right, leftRoom);
-  return {left, right};
+  return {std::max(0, leftRoom), std::max(0, rightRoom)};
 }
 
 } // namespace x4::view_bounds

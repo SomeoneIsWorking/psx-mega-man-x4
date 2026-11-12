@@ -47,6 +47,10 @@ void synchronizePresentation(Core &core) {
   session(core).widescreen.synchronizePresentation(core);
 }
 
+void submitFrame(Core &core) {
+  session(core).widescreen.submitFrame(core);
+}
+
 } // namespace
 
 // The retail libcd stays guest code; its object only lends its bodies to the title's CD wrappers.
@@ -91,13 +95,14 @@ std::unique_ptr<psx::game::TitleSessionState> Runtime::createSession(Game &game)
 
 std::unique_ptr<psx::game::FrameDriver> Runtime::createFrameDriver(Game &game) {
   Session &state = session(game.core);
-  return std::make_unique<frame::FrameDriver>(
-      guest::callWithoutKnownReturn,
-      frame::FieldServices{.deliverField = vsync::deliverField, .synchronizePresentation = synchronizePresentation},
-      state.movieCleanup,
-      state.musicStream,
-      state.biosThreads,
-      state.stageWarp);
+  return std::make_unique<frame::FrameDriver>(guest::callWithoutKnownReturn,
+                                              frame::FieldServices{.deliverField = vsync::deliverField,
+                                                                   .synchronizePresentation = synchronizePresentation,
+                                                                   .submitFrame = submitFrame},
+                                              state.movieCleanup,
+                                              state.musicStream,
+                                              state.biosThreads,
+                                              state.stageWarp);
 }
 
 void Runtime::deliverPad(Core &core, const psx::input::PadDelivery &delivery) {
