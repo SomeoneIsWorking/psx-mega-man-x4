@@ -20,14 +20,20 @@ int toward(int value, int target, int step) {
   return value < target ? std::min(target, value + step) : std::max(target, value - step);
 }
 
-// The view's offset from layer 0's clamp window; `lo > hi` is a room narrower than the wide view.
-int viewOffset(Core &core, const View &previous, int x, int lo, int hi) {
+// The offsets that keep the wide view inside layer 0's clamp window.
+struct OffsetRange {
+  int lo;
+  int hi;
+};
+
+int viewOffset(Core &core, const View &previous, int x, OffsetRange range) {
+  const auto [lo, hi] = range;
   const int target = std::clamp(0, lo, hi);
   if (!previous.inStage) {
     return target;
   }
   const int moved = x - previous.cameraX;
-  const int step = static_cast<std::int8_t>(core.mem_r8(guest::kCameraLayersAddress + kBoundStep));
+  const int step = core.mem_r8s(guest::kCameraLayersAddress + kBoundStep);
   int offset = toward(previous.offset, target, std::max(step, 0) + std::abs(moved));
   const int viewed = previous.cameraX + previous.offset;
   if ((moved > 0 && x + offset < viewed) || (moved < 0 && x + offset > viewed)) {
@@ -51,25 +57,27 @@ View nextView(Core &core, const View &previous, int margin) {
   const int lo = margin - leftRoom;
   const int hi = rightRoom - margin;
   if (lo > hi) {
-    view.offset = margin - psx::present::fitMargins({leftRoom, rightRoom}, margin).left;
-    view.picture = {leftRoom, rightRoom};
+    view.beyond.view = psx::present::fitWindows({.view = {leftRoom, rightRoom}}, margin).view;
+    view.offset = margin - view.beyond.view.left;
   } else {
-    view.offset = viewOffset(core, previous, x, lo, hi);
-    view.picture = {margin - view.offset, margin + view.offset};
+    view.offset = viewOffset(core, previous, x, {lo, hi});
+    view.beyond.view = {margin - view.offset, margin + view.offset};
   }
+  psx::present::HorizontalMargins &picture = view.beyond.picture;
+  picture = {leftRoom, rightRoom};
   // A layer that does not loop has no tile left of map column 0 or past its last block.
   for (int layer = 0; layer < static_cast<int>(guest::kCameraLayerCount); ++layer) {
     const std::uint32_t base = camera + static_cast<std::uint32_t>(layer) * guest::kCameraLayerStride;
-    if (core.mem_r8(base + Offsets::kEnabled) == 0 || camera_layers::loops(core, layer)) {
+    if (core.mem_r8(base + Offsets::kEnabled) == 0 || camera_layers::LoopBlocks(core, layer).loops()) {
       continue;
     }
     const int shift = camera_layers::layerShift(core, layer, view.offset);
     const int scroll = core.mem_r16s(base + Offsets::kScrollX);
     const int mapWidth = (core.mem_r8(base + Offsets::kMapRightBlock) + 1) * kMapBlock;
-    view.picture.left = std::min(view.picture.left, scroll - shift);
-    view.picture.right = std::min(view.picture.right, mapWidth - kScreenWidth - scroll + shift);
+    picture.left = std::min(picture.left, scroll - shift);
+    picture.right = std::min(picture.right, mapWidth - kScreenWidth - scroll + shift);
   }
-  view.picture = {std::max(0, view.picture.left), std::max(0, view.picture.right)};
+  picture = {std::max(0, picture.left), std::max(0, picture.right)};
   return view;
 }
 

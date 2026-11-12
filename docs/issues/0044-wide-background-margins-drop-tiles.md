@@ -142,11 +142,19 @@ through 3945 (view at the left bound), floor 1 / sky 0 for 3946-3973, floor 2 / 
 stage 0's far layer (mode 4, default loop blocks) runs out of map, so in view coordinates the floor moves 2 and the sky
 1 per frame, steady. The walk-left section stays at the bound (0 / 0).
 
+In-place pillarbox (2026-11-13): `pictureBeyondBuffer` now returns `PictureBeyondBuffer{view, picture}`. X4's view is
+layer 0's clamp window (`{M - offset, M + offset}`, a room narrower than the wide view centred in it), its picture the
+room and every non-looping layer's map. psxport `fitWindows` makes each record's `RecordWindows{view, drawn}`; the
+canvas draws the drawn window and the present always shows the 2M-wide view window, black outside the drawn columns
+(`present.frag` `cols`). Every X4 margin consumer (background columns, HUD anchor, cull, activity boxes) reads
+`windows().drawn`; the HUD anchored to the view edge was cut by the strip. Proof (`scratch/bugs-1112/pb`, report
+`-154132`'s pad, every frame 3936-3980, judgement settings): every in-stage present samples the same 3424-wide view
+into the same viewport (`disp=…,3424,1920 viewport=0,3,3840,2153`); the left strip is 27 columns at the bound
+(3936-3946), then shrinks 1 per frame to 0 at 3973 with the far layer, while the floor moves 2 and the sky 1 per frame
+from 3947 to 3980 with no step at the handoff (`a_motion.txt`, `a_3940.png`, `a_3960.png`, `a_3980.png`,
+`b_3940.png` with the HUD whole).
+
 Still open:
-- Pillarbox placement: `fitPicture` centres a narrower picture, so while a non-looping layer's map edge limits the
-  picture the whole picture drifts on the sink by half the limit's change (0.5 column per frame in 3946-3973). The
-  proper fix is an in-place pillarbox: the record carries both the view window (from the split) and the drawn window,
-  the presenter places the view window and leaves the undrawn columns black. Not built yet.
 - Objects bound to layer 1/2 (`VisibilityCull::layerFor`) are not moved with their layer yet; their draw needs an owner
   that moves their packets by `layerShift` (cull follows once draw does).
 - Report 5/10 part-0 checkpoint warp and the 1,000-sprite arena (reports 6, 8) not started.

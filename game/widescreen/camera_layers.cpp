@@ -4,6 +4,8 @@
 #include "core.h"
 #include "title/player_object.h"
 
+#include <optional>
+
 namespace x4::camera_layers {
 namespace {
 
@@ -23,30 +25,38 @@ std::uint32_t layerAddress(int layer) {
 
 // The camera term of a layer's x for its mode; the stage's +0x40 offset cancels in a difference. Modes 1-8 of both
 // tables (FUN_80027EE8.., FUN_80028390..; 2 is FUN_80028070 / FUN_80028518), with retail's arithmetic shifts.
-bool cameraTerm(int mode, int camera, int &term) {
+enum class ScrollMode : std::uint8_t {
+  Pick = 0,
+  Half = 1,
+  Camera = 2,
+  Quarter = 3,
+  HalfAgain = 4,
+  Owned = 5, // FUN_800285E0 leaves the layer where its owner put it
+  ThreeQuarters = 6,
+  FiveQuarters = 7,
+  ThreeHalves = 8,
+};
+
+std::optional<int> cameraTerm(ScrollMode mode, int camera) {
   switch (mode) {
-  case 1:
-  case 4:
-    term = camera >> 1;
-    return true;
-  case 2:
-    term = camera;
-    return true;
-  case 3:
-    term = camera >> 2;
-    return true;
-  case 6:
-    term = (camera >> 1) + (camera >> 2);
-    return true;
-  case 7:
-    term = camera + (camera >> 2);
-    return true;
-  case 8:
-    term = camera + (camera >> 1);
-    return true;
-  default:
-    return false; // 0 picks the mode, 5 (FUN_800285E0) leaves the layer where its owner put it
+  case ScrollMode::Half:
+  case ScrollMode::HalfAgain:
+    return camera >> 1;
+  case ScrollMode::Camera:
+    return camera;
+  case ScrollMode::Quarter:
+    return camera >> 2;
+  case ScrollMode::ThreeQuarters:
+    return (camera >> 1) + (camera >> 2);
+  case ScrollMode::FiveQuarters:
+    return camera + (camera >> 2);
+  case ScrollMode::ThreeHalves:
+    return camera + (camera >> 1);
+  case ScrollMode::Pick:
+  case ScrollMode::Owned:
+    return std::nullopt;
   }
+  return std::nullopt;
 }
 
 int floorDiv(int value, int divisor) {
@@ -62,32 +72,27 @@ int layerShift(Core &core, int layer, int viewOffset) {
   }
   const std::uint32_t base = layerAddress(layer);
   const int camera = core.mem_r16s(guest::kCameraLayersAddress + CameraLayerOffsets::kScrollX);
-  const int mode = core.mem_r8(base + CameraLayerOffsets::kMode);
-  int now = 0;
-  int viewed = 0;
-  if (core.mem_r8(base + kFollows) == 0 || !cameraTerm(mode, camera, now) ||
-      !cameraTerm(mode, static_cast<std::int16_t>(camera + viewOffset), viewed)) {
+  const auto mode = static_cast<ScrollMode>(core.mem_r8(base + CameraLayerOffsets::kMode));
+  const std::optional<int> now = cameraTerm(mode, camera);
+  const std::optional<int> viewed = cameraTerm(mode, static_cast<std::int16_t>(camera + viewOffset));
+  if (core.mem_r8(base + kFollows) == 0 || !now || !viewed) {
     return viewOffset;
   }
-  return viewOffset - (viewed - now);
+  return viewOffset - (*viewed - *now);
 }
 
-bool loops(Core &core, int layer) {
-  const std::uint32_t base = layerAddress(layer);
-  return core.mem_r8(base + kLoopFirstBlock) != 0 ||
-         core.mem_r8(base + CameraLayerOffsets::kMapRightBlock) + 1u != core.mem_r8(kMapRowBlocks);
-}
+LoopBlocks::LoopBlocks(Core &core, int layer)
+    : first_(static_cast<int>(core.mem_r8(layerAddress(layer) + kLoopFirstBlock))),
+      last_(static_cast<int>(core.mem_r8(layerAddress(layer) + CameraLayerOffsets::kMapRightBlock))),
+      loops_(first_ != 0 || static_cast<std::uint32_t>(last_) + 1u != core.mem_r8(kMapRowBlocks)) {}
 
-int wrappedColumn(Core &core, int layer, int column) {
-  const std::uint32_t base = layerAddress(layer);
-  const int first = core.mem_r8(base + kLoopFirstBlock);
-  const int last = core.mem_r8(base + CameraLayerOffsets::kMapRightBlock);
-  const int span = last - first + 1;
+int LoopBlocks::wrap(int column) const {
+  const int span = last_ - first_ + 1;
   const int block = floorDiv(column, 1 << kBlockShift);
-  if (span <= 0 || (block >= first && block <= last)) {
+  if (!loops_ || span <= 0 || (block >= first_ && block <= last_)) {
     return column;
   }
-  const int wrapped = first + ((block - first) % span + span) % span;
+  const int wrapped = first_ + ((block - first_) % span + span) % span;
   return column + (wrapped - block) * (1 << kBlockShift);
 }
 

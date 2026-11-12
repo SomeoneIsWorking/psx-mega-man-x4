@@ -35,7 +35,7 @@ psx::present::PresentationAspect WidescreenPolicy::presentationAspect(const Core
   return psx::present::GuestWidescreenProjection::presentationAspect(core);
 }
 
-psx::present::HorizontalMargins WidescreenPolicy::pictureBeyondBuffer(Core &core) const {
+psx::present::PictureBeyondBuffer WidescreenPolicy::pictureBeyondBuffer(Core &core) const {
   return session(core).widescreen.submittedPicture();
 }
 
@@ -97,24 +97,16 @@ void WidescreenController::publishDrawEnvironment(Core &core, GuestBody retailBo
   core.mem_w16(environment + kDrawEnvironmentWidthOffset, static_cast<uint16_t>(plan_.guestDrawWidth));
 }
 
-psx::present::HorizontalMargins WidescreenController::margins(Core &core) const {
+psx::present::RecordWindows WidescreenController::windows(Core &core) const {
   if (!plan_.widescreen()) {
     return {};
   }
   (void)core;
-  return psx::present::fitMargins(view_.picture, plan_.presentationHorizontalMargin);
+  return psx::present::fitWindows(view_.beyond, plan_.presentationHorizontalMargin);
 }
 
 void WidescreenController::stepView(Core &core) {
   view_ = view_bounds::nextView(core, view_, plan_.widescreen() ? plan_.presentationHorizontalMargin : 0);
-  lucent::debug("x4-view",
-                "camera x {} offset {} picture {}/{} shifts {}/{}",
-                view_.cameraX,
-                view_.offset,
-                view_.picture.left,
-                view_.picture.right,
-                layerShift(core, 1),
-                layerShift(core, 2));
 }
 
 int WidescreenController::layerShift(Core &core, int layer) const {
@@ -126,7 +118,7 @@ void WidescreenController::submitFrame(Core &core) {
   if (core.mem_r8(StageWarp::kEngine + StageWarp::kStateOffset) != StageWarp::kInStage) {
     view_ = {};
   }
-  submitted_ = view_.picture;
+  submitted_ = view_.beyond;
 }
 
 void WidescreenController::synchronizePresentation(Core &core) {

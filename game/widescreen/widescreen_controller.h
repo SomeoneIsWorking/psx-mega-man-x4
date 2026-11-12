@@ -11,7 +11,7 @@ namespace x4 {
 class WidescreenPolicy final : public psx::present::GuestWidescreenProjection {
 public:
   psx::present::PresentationAspect presentationAspect(const Core &core) const override;
-  psx::present::HorizontalMargins pictureBeyondBuffer(Core &core) const override;
+  psx::present::PictureBeyondBuffer pictureBeyondBuffer(Core &core) const override;
 };
 
 class WidescreenController {
@@ -30,16 +30,16 @@ public:
   const psx::present::GuestProjectionPlan &plan() const {
     return plan_;
   }
-  // The picture columns each side of the frame being drawn; its record is sealed with the same split.
-  psx::present::HorizontalMargins margins(Core &core) const;
+  // The view and drawn columns each side of the frame being drawn; its record is sealed with the same windows.
+  psx::present::RecordWindows windows(Core &core) const;
   // The camera layers moved (after FUN_800281E8): the view of the frame now being drawn.
   void stepView(Core &core);
   // Columns layer `layer`'s retail packets and objects move in the frame being drawn (camera_layers::layerShift).
   int layerShift(Core &core, int layer) const;
   // The frame's ordering table went to the GPU; its record is sealed with this frame's view.
   void submitFrame(Core &core);
-  // The picture beyond the buffer of the frame last submitted.
-  psx::present::HorizontalMargins submittedPicture() const {
+  // The view and picture beyond the buffer of the frame last submitted.
+  psx::present::PictureBeyondBuffer submittedPicture() const {
     return submitted_;
   }
 
@@ -48,7 +48,7 @@ private:
   psx::present::GuestProjectionPlan plan_;
   bool projectionPublished_ = false;
   view_bounds::View view_;
-  psx::present::HorizontalMargins submitted_{psx::present::kUnboundedPicture, psx::present::kUnboundedPicture};
+  psx::present::PictureBeyondBuffer submitted_;
 };
 
 } // namespace x4

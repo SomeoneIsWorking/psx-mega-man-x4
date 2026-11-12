@@ -15,11 +15,22 @@ inline constexpr std::uint32_t kLastLayerUpdate = 0x800281E8u;
 // camera, the layer is drawn as at camera x + viewOffset: viewOffset - (scroll(x + viewOffset) - scroll(x)).
 int layerShift(Core &core, int layer, int viewOffset);
 
-// The layer's map repeats between its loop blocks; FUN_8002771C starts every layer on the whole map (0 and the row
-// width - 1), so only a stage object that set other loop blocks makes it repeat.
-bool loops(Core &core, int layer);
+// A layer's loop blocks (+0x4D first, +0x4E last): its map repeats between them. FUN_8002771C starts every layer on
+// the whole map (0 and the row width - 1), so only a stage object that set other loop blocks makes it repeat.
+class LoopBlocks {
+public:
+  LoopBlocks(Core &core, int layer);
 
-// The map column (tiles) a column past a looping layer's loop blocks reads: FUN_80027344's block wrap.
-int wrappedColumn(Core &core, int layer, int column);
+  bool loops() const {
+    return loops_;
+  }
+  // The map column (tiles) `column` reads: FUN_80027344's block wrap on a looping layer, itself otherwise.
+  int wrap(int column) const;
+
+private:
+  int first_;
+  int last_;
+  bool loops_;
+};
 
 } // namespace x4::camera_layers

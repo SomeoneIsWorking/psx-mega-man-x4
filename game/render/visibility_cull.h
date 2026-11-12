@@ -31,6 +31,12 @@ struct RetailSlack {
   static constexpr int kLoose = 64;
 };
 
+// Per-side slack in pixels around an object's screen position.
+struct Slack {
+  int halfWidth;
+  int halfHeight;
+};
+
 // BaseObj: `lb 0x14` @ 0x8002B28C, `lhu 0xa/0xe` @ 0x8002B29C/0x8002B2A0.
 // QuadObj: `lb 0x37` @ 0x800D46F8, `lhu 0xa/0xe` @ 0x800D470C/0x800D4714.
 inline constexpr std::uint32_t kBaseObjectBackgroundOffset = 0x14u;

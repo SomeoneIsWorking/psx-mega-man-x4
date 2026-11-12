@@ -16,7 +16,7 @@ void hudPass(Core *core) {
   const ArenaPositions before = HudAnchor::positions(*core);
   psx::cpu::callOriginalResumingToReturn(*core, "hud::hudPass original", kHudPass, core->r[31]);
   session(*core).coop.drawHud(*core);
-  HudAnchor{session(*core).widescreen.margins(*core)}.anchor(*core, before);
+  HudAnchor{session(*core).widescreen.windows(*core).drawn}.anchor(*core, before);
 }
 
 } // namespace

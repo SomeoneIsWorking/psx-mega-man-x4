@@ -21,14 +21,14 @@ void original(Core *core, std::uint32_t address, const char *owner) {
 
 WideBackground wideBackground(Core &core) {
   const WidescreenController &widescreen = session(core).widescreen;
-  return {widescreen.margins(core), {0, widescreen.layerShift(core, 1), widescreen.layerShift(core, 2)}};
+  return {widescreen.windows(core).drawn, {0, widescreen.layerShift(core, 1), widescreen.layerShift(core, 2)}};
 }
 
 void drawLayer(Core *core) {
   const int layer = static_cast<int>(core->r[kArg0]);
   const std::uint32_t firstRetailSprite = core->mem_r32(kSpriteCursor);
   original(core, kDrawLayer, "background::drawLayer original");
-  wideBackground(*core).drawLayer(*core, layer, firstRetailSprite);
+  wideBackground(*core).drawLayer(*core, {.layer = layer, .firstRetailSprite = firstRetailSprite});
 }
 
 void refillRing(Core *core) {

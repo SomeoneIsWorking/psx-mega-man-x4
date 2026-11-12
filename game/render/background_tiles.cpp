@@ -132,7 +132,7 @@ void WideBackground::refillRing(Core &core) const {
   for (int layer = 0; layer < guest::kCameraLayerCount; ++layer) {
     const LayerView view = readLayer(core, layer);
     const MarginColumns columns = marginColumns(view.scrollX, layerMargins(layer));
-    const bool loops = camera_layers::loops(core, layer);
+    const camera_layers::LoopBlocks loop(core, layer);
     if (columns.total() == 0 || view.scrollY < 0) {
       continue;
     }
@@ -144,7 +144,7 @@ void WideBackground::refillRing(Core &core) const {
           continue;
         }
         const int column = first + offset;
-        const int mapColumn = loops ? camera_layers::wrappedColumn(core, layer, column) : column;
+        const int mapColumn = loop.wrap(column);
         const std::uint16_t cell =
             view.contains(mapColumn, row) ? mapTile(core, layer, mapColumn, row) : std::uint16_t{0};
         core.mem_w16(ringCell(layer, row, column), cell);
@@ -153,7 +153,8 @@ void WideBackground::refillRing(Core &core) const {
   }
 }
 
-void WideBackground::drawLayer(Core &core, int layer, std::uint32_t firstRetailSprite) const {
+void WideBackground::drawLayer(Core &core, const LayerPass &pass) const {
+  const auto [layer, firstRetailSprite] = pass;
   const int shift = shifts_[static_cast<std::size_t>(layer)];
   std::uint32_t sprite = core.mem_r32(kSpriteCursor);
   if (shift != 0) {

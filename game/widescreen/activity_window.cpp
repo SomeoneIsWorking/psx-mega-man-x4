@@ -32,7 +32,7 @@ int readShort(Core &core, std::uint32_t address) {
 }
 
 psx::present::HorizontalMargins presentedMargins(Core &core) {
-  return session(core).widescreen.margins(core);
+  return session(core).widescreen.windows(core).drawn;
 }
 
 void placeInBox(Core &core, const Box &box, std::uint32_t link) {
@@ -49,10 +49,10 @@ void placeInBox(Core &core, const Box &box, std::uint32_t link) {
 
 void stripScan(Core *core) {
   const std::uint32_t link = core->r[kReturnAddress];
-  const StripBoxes boxes = stripBoxes(readShort(*core, kCameraX),
-                                      readShort(*core, kCameraY),
-                                      readShort(*core, kScannedX),
-                                      readShort(*core, kScannedY),
+  const StripBoxes boxes = stripBoxes({.cameraX = readShort(*core, kCameraX),
+                                       .cameraY = readShort(*core, kCameraY),
+                                       .scannedX = readShort(*core, kScannedX),
+                                       .scannedY = readShort(*core, kScannedY)},
                                       presentedMargins(*core));
   if (boxes.horizontal) {
     placeInBox(*core, boxes.columns, link);
@@ -79,23 +79,24 @@ void publishOutside(Core &core, bool inside) {
   core.r[kReturnValue] = inside ? 0u : 1u;
 }
 
-bool insideLifetime(Core &core, std::uint32_t object, int halfWidth, int halfHeight) {
-  const cull::VisibilityCull window{session(core).widescreen.margins(core)};
+bool insideLifetime(Core &core, std::uint32_t object, const cull::Slack &slack) {
+  const cull::VisibilityCull window{presentedMargins(core)};
   const cull::ScreenCoordinate x = window.screenX(core, object, cull::ObjectLayout::BaseObject);
   const cull::ScreenCoordinate y = window.screenY(core, object, cull::ObjectLayout::BaseObject);
-  return window.inside(x.value, y.value, halfWidth, halfHeight);
+  return window.inside(x.value, y.value, slack.halfWidth, slack.halfHeight);
 }
 
 void outsideLoose(Core *core) {
-  publishOutside(*core, insideLifetime(*core, core->r[kArg0], kLifetimeSlack, kLifetimeSlack));
+  publishOutside(*core, insideLifetime(*core, core->r[kArg0], {kLifetimeSlack, kLifetimeSlack}));
 }
 
 // a1/a2 are s16 half-extents (`sll 16; sra 16` at entry).
 void outsideParametric(Core *core) {
   publishOutside(
       *core,
-      insideLifetime(
-          *core, core->r[kArg0], static_cast<std::int16_t>(core->r[kArg1]), static_cast<std::int16_t>(core->r[kArg2])));
+      insideLifetime(*core,
+                     core->r[kArg0],
+                     {static_cast<std::int16_t>(core->r[kArg1]), static_cast<std::int16_t>(core->r[kArg2])}));
 }
 
 void outsideLooseLayer0(Core *core) {
@@ -108,7 +109,8 @@ void outsideLooseLayer0(Core *core) {
 
 } // namespace
 
-StripBoxes stripBoxes(int cameraX, int cameraY, int scannedX, int scannedY, psx::present::HorizontalMargins margins) {
+StripBoxes stripBoxes(const ScanStep &step, psx::present::HorizontalMargins margins) {
+  const auto [cameraX, cameraY, scannedX, scannedY] = step;
   StripBoxes boxes;
   if (scannedX != cameraX) {
     const bool right = scannedX < cameraX;

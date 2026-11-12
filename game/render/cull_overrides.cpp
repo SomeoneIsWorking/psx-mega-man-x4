@@ -26,14 +26,8 @@ struct Verdicts {
   bool widened;
 };
 
-// Per-side slack in pixels.
-struct Slack {
-  int halfWidth;
-  int halfHeight;
-};
-
 Verdicts decide(Core &core, std::uint32_t object, const Slack &slack) {
-  const VisibilityCull widened{session(core).widescreen.margins(core)};
+  const VisibilityCull widened{session(core).widescreen.windows(core).drawn};
   const VisibilityCull retail = VisibilityCull::retail();
   const ScreenCoordinate x = retail.screenX(core, object, ObjectLayout::BaseObject);
   const ScreenCoordinate y = retail.screenY(core, object, ObjectLayout::BaseObject);
@@ -70,7 +64,7 @@ void onScreenParametric(Core *core) {
 void quadOnScreen(Core *core) {
   const std::uint32_t object = core->r[kArg0];
   const Verdicts verdicts{VisibilityCull::retail().quadOnScreen(*core, object),
-                          VisibilityCull{session(*core).widescreen.margins(*core)}.quadOnScreen(*core, object)};
+                          VisibilityCull{session(*core).widescreen.windows(*core).drawn}.quadOnScreen(*core, object)};
   publish(*core, object, verdicts);
 }
 

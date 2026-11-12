@@ -52,7 +52,7 @@ struct RetailBox {
 };
 
 // Scan direction passed to 0x80028FEC.
-enum class Direction : std::uint32_t { Whole = 0, Right = 1, Left = 2, Down = 3, Up = 4 };
+enum class Direction : std::uint8_t { Whole = 0, Right = 1, Left = 2, Down = 3, Up = 4 };
 
 struct Box {
   int left;
@@ -69,8 +69,14 @@ struct StripBoxes {
   bool vertical = false;
   Box rows{};
 };
-[[nodiscard]] StripBoxes
-stripBoxes(int cameraX, int cameraY, int scannedX, int scannedY, psx::present::HorizontalMargins margins);
+// The camera this tick and where the last tick's scan stood.
+struct ScanStep {
+  int cameraX;
+  int cameraY;
+  int scannedX;
+  int scannedY;
+};
+[[nodiscard]] StripBoxes stripBoxes(const ScanStep &step, psx::present::HorizontalMargins margins);
 [[nodiscard]] Box viewBox(int cameraX, int cameraY, psx::present::HorizontalMargins margins);
 
 void registerOverrides(Core &core);
