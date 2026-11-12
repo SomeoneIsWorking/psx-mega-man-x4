@@ -63,7 +63,7 @@ void HudAnchor::shiftPacket(Core &core, std::uint32_t packet) const {
     const int x = static_cast<std::int16_t>(core.mem_r16(packet + kFirstVertexOffset + i * stride));
     leftmost = i == 0 ? x : std::min(leftmost, x);
   }
-  const int shift = leftmost < kCentre ? -margin() : margin();
+  const int shift = leftmost < kCentre ? -margins_.left : margins_.right;
   for (std::uint32_t i = 0; i < count; ++i) {
     const std::uint32_t address = packet + kFirstVertexOffset + i * stride;
     core.mem_w16(address, static_cast<std::uint16_t>(static_cast<std::int16_t>(core.mem_r16(address)) + shift));
@@ -71,7 +71,7 @@ void HudAnchor::shiftPacket(Core &core, std::uint32_t packet) const {
 }
 
 void HudAnchor::anchor(Core &core, const ArenaPositions &before) const {
-  if (margin() == 0) {
+  if (margins_.total() == 0) {
     return;
   }
   const ArenaPositions after = positions(core);

@@ -4,6 +4,8 @@
 // at a wide aspect both follow the presentation margin, so an enemy is placed before it enters the margin.
 #pragma once
 
+#include "guest_widescreen_projection.h"
+
 #include <cstdint>
 
 class Core;
@@ -67,8 +69,9 @@ struct StripBoxes {
   bool vertical = false;
   Box rows{};
 };
-[[nodiscard]] StripBoxes stripBoxes(int cameraX, int cameraY, int scannedX, int scannedY, int margin);
-[[nodiscard]] Box viewBox(int cameraX, int cameraY, int margin);
+[[nodiscard]] StripBoxes
+stripBoxes(int cameraX, int cameraY, int scannedX, int scannedY, psx::present::HorizontalMargins margins);
+[[nodiscard]] Box viewBox(int cameraX, int cameraY, psx::present::HorizontalMargins margins);
 
 void registerOverrides(Core &core);
 

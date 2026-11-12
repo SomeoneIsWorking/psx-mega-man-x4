@@ -33,7 +33,7 @@ struct Slack {
 };
 
 Verdicts decide(Core &core, std::uint32_t object, const Slack &slack) {
-  const VisibilityCull widened{session(core).widescreen.plan()};
+  const VisibilityCull widened{session(core).widescreen.margins(core)};
   const VisibilityCull retail = VisibilityCull::retail();
   const ScreenCoordinate x = retail.screenX(core, object, ObjectLayout::BaseObject);
   const ScreenCoordinate y = retail.screenY(core, object, ObjectLayout::BaseObject);
@@ -70,7 +70,7 @@ void onScreenParametric(Core *core) {
 void quadOnScreen(Core *core) {
   const std::uint32_t object = core->r[kArg0];
   const Verdicts verdicts{VisibilityCull::retail().quadOnScreen(*core, object),
-                          VisibilityCull{session(*core).widescreen.plan()}.quadOnScreen(*core, object)};
+                          VisibilityCull{session(*core).widescreen.margins(*core)}.quadOnScreen(*core, object)};
   publish(*core, object, verdicts);
 }
 

@@ -10,6 +10,7 @@ namespace x4 {
 class WidescreenPolicy final : public psx::present::GuestWidescreenProjection {
 public:
   psx::present::PresentationAspect presentationAspect(const Core &core) const override;
+  psx::present::HorizontalMargins presentedMargins(Core &core, int margin) const override;
 };
 
 class WidescreenController {
@@ -28,6 +29,8 @@ public:
   const psx::present::GuestProjectionPlan &plan() const {
     return plan_;
   }
+  // This frame's picture columns each side, as the presenter will latch them from the same camera.
+  psx::present::HorizontalMargins margins(Core &core) const;
 
 private:
   ProjectionLatch latch_;

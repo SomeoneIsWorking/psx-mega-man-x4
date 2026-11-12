@@ -28,11 +28,7 @@ using ArenaPositions = std::array<std::uint32_t, kArenaCursors.size()>;
 
 class HudAnchor {
 public:
-  explicit HudAnchor(const psx::present::GuestProjectionPlan &plan) : margin_(plan.presentationHorizontalMargin) {}
-
-  int margin() const {
-    return margin_ > 0 ? margin_ : 0;
-  }
+  explicit HudAnchor(psx::present::HorizontalMargins margins) : margins_(margins) {}
 
   static ArenaPositions positions(Core &core);
 
@@ -42,7 +38,7 @@ public:
 private:
   void shiftPacket(Core &core, std::uint32_t packet) const;
 
-  int margin_;
+  psx::present::HorizontalMargins margins_;
 };
 
 } // namespace x4::hud

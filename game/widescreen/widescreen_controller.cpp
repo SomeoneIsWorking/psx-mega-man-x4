@@ -6,6 +6,7 @@
 #include "game.h"
 #include "guest_widescreen_projection.h"
 #include "runtime/session.h"
+#include "view_bounds.h"
 
 #include <cstdlib>
 #include <limits>
@@ -30,6 +31,10 @@ psx::present::PresentationAspect WidescreenPolicy::presentationAspect(const Core
   }
   // The player's Aspect Ratio row (Mods::aspect) picks the widening.
   return psx::present::GuestWidescreenProjection::presentationAspect(core);
+}
+
+psx::present::HorizontalMargins WidescreenPolicy::presentedMargins(Core &core, int margin) const {
+  return view_bounds::fillableMargins(core, margin);
 }
 
 WidescreenController::WidescreenController() : WidescreenController(psx::present::latchGuestProjection) {}
@@ -88,6 +93,14 @@ void WidescreenController::publishDrawEnvironment(Core &core, GuestBody retailBo
 
   // Only RECT.w is replaced; the retail body owns every other field.
   core.mem_w16(environment + kDrawEnvironmentWidthOffset, static_cast<uint16_t>(plan_.guestDrawWidth));
+}
+
+psx::present::HorizontalMargins WidescreenController::margins(Core &core) const {
+  if (!plan_.widescreen()) {
+    return {};
+  }
+  const int margin = plan_.presentationHorizontalMargin;
+  return psx::present::clampedMargins(view_bounds::fillableMargins(core, margin), margin);
 }
 
 void WidescreenController::synchronizePresentation(Core &core) {

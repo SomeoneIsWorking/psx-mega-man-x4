@@ -5,6 +5,8 @@
 #include "core.h"
 #include "player_object.h"
 
+#include <algorithm>
+
 namespace x4::background {
 namespace {
 
@@ -108,23 +110,22 @@ int reservedSprites(Core &core, int layer) {
 
 } // namespace
 
-MarginColumns marginColumns(int scrollX, int marginPixels) {
-  if (marginPixels <= 0 || scrollX < 0) {
+MarginColumns marginColumns(int scrollX, psx::present::HorizontalMargins margins) {
+  if (margins.total() <= 0 || scrollX < 0) {
     return {0, 0};
   }
   const int fraction = scrollX & kTileMask;
   // Retail's first sprite starts at -fraction and the 21st ends at 336 - fraction.
   const int retailEnd = RetailWindow::kColumns * kTile - fraction;
-  const int left = ceilTiles(marginPixels - fraction);
-  const int right = ceilTiles(320 + marginPixels - retailEnd);
-  const int cap = RetailWindow::kMaxSideColumns;
-  return {left < cap ? left : cap, right < cap ? right : cap};
+  const int left = std::min(ceilTiles(margins.left - fraction), RetailWindow::kSpareColumns);
+  const int right = ceilTiles(320 + margins.right - retailEnd);
+  return {left, std::min(right, RetailWindow::kSpareColumns - left)};
 }
 
 void WideBackground::refillRing(Core &core) const {
   for (int layer = 0; layer < guest::kCameraLayerCount; ++layer) {
     const LayerView view = readLayer(core, layer);
-    const MarginColumns columns = marginColumns(view.scrollX, margin());
+    const MarginColumns columns = marginColumns(view.scrollX, margins_);
     if (columns.total() == 0 || view.scrollY < 0) {
       continue;
     }
@@ -145,7 +146,7 @@ void WideBackground::refillRing(Core &core) const {
 
 void WideBackground::drawLayer(Core &core, int layer) const {
   const LayerView view = readLayer(core, layer);
-  const MarginColumns columns = marginColumns(view.scrollX, margin());
+  const MarginColumns columns = marginColumns(view.scrollX, margins_);
   if (columns.total() == 0 || view.scrollY < 0) {
     return;
   }

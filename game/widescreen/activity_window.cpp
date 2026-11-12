@@ -31,8 +31,8 @@ int readShort(Core &core, std::uint32_t address) {
   return static_cast<std::int16_t>(core.mem_r16(address));
 }
 
-int presentationMargin(Core &core) {
-  return cull::VisibilityCull{session(core).widescreen.plan()}.horizontalMargin();
+psx::present::HorizontalMargins presentedMargins(Core &core) {
+  return session(core).widescreen.margins(core);
 }
 
 void placeInBox(Core &core, const Box &box, std::uint32_t link) {
@@ -53,7 +53,7 @@ void stripScan(Core *core) {
                                       readShort(*core, kCameraY),
                                       readShort(*core, kScannedX),
                                       readShort(*core, kScannedY),
-                                      presentationMargin(*core));
+                                      presentedMargins(*core));
   if (boxes.horizontal) {
     placeInBox(*core, boxes.columns, link);
   }
@@ -65,7 +65,7 @@ void stripScan(Core *core) {
 
 void viewScan(Core *core) {
   const std::uint32_t link = core->r[kReturnAddress];
-  placeInBox(*core, viewBox(readShort(*core, kCameraX), readShort(*core, kCameraY), presentationMargin(*core)), link);
+  placeInBox(*core, viewBox(readShort(*core, kCameraX), readShort(*core, kCameraY), presentedMargins(*core)), link);
   const std::uint32_t entry =
       kStageGroupTable +
       (core->mem_r8(kStage) * 2u + static_cast<std::uint32_t>(static_cast<std::int8_t>(core->mem_r8(kStagePart)))) * 4u;
@@ -80,7 +80,7 @@ void publishOutside(Core &core, bool inside) {
 }
 
 bool insideLifetime(Core &core, std::uint32_t object, int halfWidth, int halfHeight) {
-  const cull::VisibilityCull window{session(core).widescreen.plan()};
+  const cull::VisibilityCull window{session(core).widescreen.margins(core)};
   const cull::ScreenCoordinate x = window.screenX(core, object, cull::ObjectLayout::BaseObject);
   const cull::ScreenCoordinate y = window.screenY(core, object, cull::ObjectLayout::BaseObject);
   return window.inside(x.value, y.value, halfWidth, halfHeight);
@@ -102,18 +102,20 @@ void outsideLooseLayer0(Core *core) {
   const std::uint32_t object = core->r[kArg0];
   const int x = static_cast<std::int16_t>(core->mem_r16(object + cull::kPositionIntegerX) - core->mem_r16(kCameraX));
   const int y = static_cast<std::int16_t>(core->mem_r16(object + cull::kPositionIntegerY) - core->mem_r16(kCameraY));
-  const cull::VisibilityCull window{session(*core).widescreen.plan()};
+  const cull::VisibilityCull window{presentedMargins(*core)};
   publishOutside(*core, window.inside(x, y, kLifetimeSlack, kLifetimeSlack));
 }
 
 } // namespace
 
-StripBoxes stripBoxes(int cameraX, int cameraY, int scannedX, int scannedY, int margin) {
+StripBoxes stripBoxes(int cameraX, int cameraY, int scannedX, int scannedY, psx::present::HorizontalMargins margins) {
   StripBoxes boxes;
   if (scannedX != cameraX) {
     const bool right = scannedX < cameraX;
-    const int left = right ? cameraX + RetailBox::kRightStripLeft + margin : cameraX + RetailBox::kLeft - margin;
-    const int rightEdge = right ? cameraX + RetailBox::kRight + margin : cameraX + RetailBox::kLeftStripRight - margin;
+    const int left =
+        right ? cameraX + RetailBox::kRightStripLeft + margins.right : cameraX + RetailBox::kLeft - margins.left;
+    const int rightEdge =
+        right ? cameraX + RetailBox::kRight + margins.right : cameraX + RetailBox::kLeftStripRight - margins.left;
     boxes.horizontal = true;
     boxes.columns = {left,
                      rightEdge,
@@ -124,8 +126,8 @@ StripBoxes stripBoxes(int cameraX, int cameraY, int scannedX, int scannedY, int 
   if (scannedY != cameraY) {
     const bool down = scannedY < cameraY;
     boxes.vertical = true;
-    boxes.rows = {cameraX + RetailBox::kLeft - margin,
-                  cameraX + RetailBox::kRight + margin,
+    boxes.rows = {cameraX + RetailBox::kLeft - margins.left,
+                  cameraX + RetailBox::kRight + margins.right,
                   down ? cameraY + RetailBox::kDownStripTop : cameraY + RetailBox::kTop,
                   down ? cameraY + RetailBox::kBottom : cameraY + RetailBox::kUpStripBottom,
                   down ? Direction::Down : Direction::Up};
@@ -133,9 +135,9 @@ StripBoxes stripBoxes(int cameraX, int cameraY, int scannedX, int scannedY, int 
   return boxes;
 }
 
-Box viewBox(int cameraX, int cameraY, int margin) {
-  return {cameraX + RetailBox::kLeft - margin,
-          cameraX + RetailBox::kRight + margin,
+Box viewBox(int cameraX, int cameraY, psx::present::HorizontalMargins margins) {
+  return {cameraX + RetailBox::kLeft - margins.left,
+          cameraX + RetailBox::kRight + margins.right,
           cameraY + RetailBox::kTop,
           cameraY + RetailBox::kBottom,
           Direction::Whole};

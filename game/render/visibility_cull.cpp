@@ -14,9 +14,9 @@ std::int32_t signExtendByte(std::uint8_t value) {
 
 } // namespace
 
-ScreenWindow ScreenWindow::horizontal(int half, int margin) {
-  const int shifted = half + margin;
-  return ScreenWindow{Arc{.offset = shifted, .bound = 2 * shifted + RetailScreen::kWidth}};
+ScreenWindow ScreenWindow::horizontal(int half, psx::present::HorizontalMargins margins) {
+  const int shifted = half + margins.left;
+  return ScreenWindow{Arc{.offset = shifted, .bound = 2 * half + margins.total() + RetailScreen::kWidth}};
 }
 
 ScreenWindow ScreenWindow::vertical(int half) {
@@ -75,7 +75,7 @@ ScreenCoordinate VisibilityCull::screenY(Core &core, std::uint32_t object, Objec
 }
 
 bool VisibilityCull::inside(int screenX, int screenY, int halfWidth, int halfHeight) const {
-  return ScreenWindow::horizontal(halfWidth, horizontalMargin()).contains(screenX) &&
+  return ScreenWindow::horizontal(halfWidth, margins_).contains(screenX) &&
          ScreenWindow::vertical(halfHeight).contains(screenY);
 }
 
@@ -88,7 +88,7 @@ bool VisibilityCull::quadOnScreen(Core &core, std::uint32_t object) const {
   const std::uint32_t scrollY = layer < 0 ? 0u : scrollBits(core, layer, guest::CameraLayerOffsets::kScrollY);
 
   // First corner inside wins; the zero slack is retail.
-  const ScreenWindow windowX = ScreenWindow::horizontal(0, horizontalMargin());
+  const ScreenWindow windowX = ScreenWindow::horizontal(0, margins_);
   const ScreenWindow windowY = ScreenWindow::vertical(0);
   for (std::uint32_t corner = 0; corner < 4; ++corner) {
     const std::uint32_t extentX = core.mem_r16(object + kQuadCornerX[corner]);

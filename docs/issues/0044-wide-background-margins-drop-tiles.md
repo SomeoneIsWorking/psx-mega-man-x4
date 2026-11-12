@@ -77,3 +77,18 @@ far side instead of the void, and a room narrower than the wide view gives a nar
 pillarboxes. The split is stamped into the `FrameRecord` at latch time so a record is presented with the split it
 was drawn with. Consumers take per-side values: `WideBackground` columns, `HudAnchor::shiftPacket`,
 `ScreenWindow::horizontal`, `activity_window` boxes, `RecordReadBack::captured`.
+
+Map-edge fix (2026-11-12): `view_bounds::fillableMargins` limits each side to the gameplay camera's clamp window
+(layer 0 `+0x1E` min x, `+0x1C` max x, the words `FUN_80028BF0` copies from the room entry) and to every enabled
+layer's map (no tile left of column 0 or past block `+0x4E`). The other side takes the rest of the 2M columns
+(`WidescreenPolicy::presentedMargins`). Every margin consumer reads `WidescreenController::margins`. Report
+`-153948` at pad frame 2704: before, 34 black columns before map column 0 (`scratch/bugs-1112/m4`); after, the canvas
+holds 40 columns left and 108 right, with no black column (`m4c/shot_2704.png`). Report `-154132`'s pad from 2706 to
+2994, every 6th frame, shows no black column (`m4d`).
+
+Still open:
+- At the stage start the left limit comes from layer 2, which scrolls at half the camera's speed. The 4:3 window
+  then moves on screen by whole pixels at that rate. Motion across consecutive presents is not yet judged.
+- The boss-room pillarbox (`-154304`) and the cut boss (`-154058`) need the part-0 checkpoint arrival.
+- Arena capacity (`-154132`, `-154209`) is unchanged; a wider right side draws more margin sprites against the
+  1,000 cap.

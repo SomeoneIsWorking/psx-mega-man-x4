@@ -23,7 +23,6 @@ struct RetailWindow {
   static constexpr int kRing = 32;
   // Ring columns not used by the retail window; the margins share them.
   static constexpr int kSpareColumns = kRing - kColumns;
-  static constexpr int kMaxSideColumns = kSpareColumns / 2;
   // Retail stops linking tile sprites at 1000 per frame (slti 0x3E8 @ 0x80026BB0); its arena holds 1024.
   static constexpr std::uint32_t kSpriteCap = 1000;
 };
@@ -64,16 +63,12 @@ struct MarginColumns {
   }
 };
 
-// Columns whose sprites reach [-margin, 320 + margin) for this scroll, each side capped to the ring's spare columns.
-MarginColumns marginColumns(int scrollX, int marginPixels);
+// Columns whose sprites reach [-left, 320 + right) for this scroll; both sides share the ring's spare columns.
+MarginColumns marginColumns(int scrollX, psx::present::HorizontalMargins margins);
 
 class WideBackground {
 public:
-  explicit WideBackground(const psx::present::GuestProjectionPlan &plan) : margin_(plan.presentationHorizontalMargin) {}
-
-  int margin() const {
-    return margin_ > 0 ? margin_ : 0;
-  }
+  explicit WideBackground(psx::present::HorizontalMargins margins) : margins_(margins) {}
 
   // Writes the margin columns of the three layers' rings from their block maps (0 outside the map).
   void refillRing(Core &core) const;
@@ -81,7 +76,7 @@ public:
   void drawLayer(Core &core, int layer) const;
 
 private:
-  int margin_;
+  psx::present::HorizontalMargins margins_;
 };
 
 } // namespace x4::background

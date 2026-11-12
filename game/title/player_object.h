@@ -71,10 +71,10 @@ struct CameraLayerOffsets {
   static constexpr uint32_t kScrollY = 0x0E;        // s16 THE camera y
   static constexpr uint32_t kAnchorX = 0x16;        // s16 screen-edge load trigger anchor
   static constexpr uint32_t kAnchorY = 0x1A;        // s16
-  static constexpr uint32_t kBoundMinX = 0x1C;      // s16 hard clamp windows (+ push-back on player)
-  static constexpr uint32_t kBoundMaxX = 0x1E;      // s16
-  static constexpr uint32_t kBoundMinY = 0x20;      // s16
-  static constexpr uint32_t kBoundMaxY = 0x22;      // s16
+  static constexpr uint32_t kBoundMaxX = 0x1C;      // s16 clamp window, room entry words 9, 8, 11, 10 (FUN_80028BF0)
+  static constexpr uint32_t kBoundMinX = 0x1E;      // s16
+  static constexpr uint32_t kBoundMaxY = 0x20;      // s16
+  static constexpr uint32_t kBoundMinY = 0x22;      // s16
   static constexpr uint32_t kDeadZoneLeft = 0x30;   // u16 horizontal dead-zone margins used by
   static constexpr uint32_t kDeadZoneRight = 0x32;  // u16 the follow helpers
   static constexpr uint32_t kStepMax = 0x48;        // u8 max forward step per frame

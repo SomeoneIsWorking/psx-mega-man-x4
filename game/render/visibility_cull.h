@@ -61,7 +61,7 @@ inline constexpr std::uint32_t kOnScreenOffset = 0x03u;
 // parametric sites take an int half-extent); contains() implements the wrapped form.
 class ScreenWindow {
 public:
-  static ScreenWindow horizontal(int half, int margin);
+  static ScreenWindow horizontal(int half, psx::present::HorizontalMargins margins);
   // No margin parameter: widening is horizontal only.
   static ScreenWindow vertical(int half);
 
@@ -93,15 +93,15 @@ struct ScreenCoordinate {
 // Recovers an object screen position, decides the cull and publishes the flag.
 class VisibilityCull {
 public:
-  explicit VisibilityCull(const psx::present::GuestProjectionPlan &plan) : margin_(plan.presentationHorizontalMargin) {}
+  // The presented columns each side (WidescreenController::margins); none at 4:3 or with widescreen off.
+  explicit VisibilityCull(psx::present::HorizontalMargins margins) : margins_(margins) {}
   // The retail box: what gameplay reads.
   static VisibilityCull retail() {
-    return VisibilityCull{0};
+    return VisibilityCull{psx::present::HorizontalMargins{}};
   }
 
-  // Already 0 at 4:3 and with widescreen off; the plan resolves both.
-  int horizontalMargin() const {
-    return margin_ > 0 ? margin_ : 0;
+  psx::present::HorizontalMargins margins() const {
+    return margins_;
   }
 
   static LayoutOffsets offsetsFor(ObjectLayout layout);
@@ -119,12 +119,10 @@ public:
   void publishOnScreen(Core &core, std::uint32_t object, bool onScreen) const;
 
 private:
-  explicit VisibilityCull(int margin) : margin_(margin) {}
-
   int layerFor(Core &core, std::uint32_t object, ObjectLayout layout) const;
   std::uint32_t scrollBits(Core &core, int layer, std::uint32_t field) const;
 
-  int margin_;
+  psx::present::HorizontalMargins margins_;
 };
 
 // One row per flag-writing cull owner; the adapters take slack from here. The sites that return an
