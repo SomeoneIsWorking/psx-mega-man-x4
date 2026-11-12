@@ -62,3 +62,18 @@ Leads, not yet proven on those screens:
 - The reports' pad recordings stop reproducing their screens on HEAD: the widened placement scans
   (`activity_window.*`) change enemy timing, and `PSXPORT_LOAD_STATE` crashes (issue 0046), so these screens need
   a warp to their room first.
+
+Reproduced on HEAD (2026-11-12): report `-153948`'s pad to frame 2704 (`scratch/bugs-1112/m4`). Layer 0 camera
+x 40, left bound 0 (`+0x1C..+0x22` read 2976, 0, 256, 256), margin 74 at the 3840x1975 sink, so the left 34 px of
+the margin lie before map column 0. `warp 0/1` lands after the intro boss (`scratch/bugs-1112/w01`), so the
+boss room of reports `-154058` and `-154304` needs a part-0 checkpoint arrival in `StageWarp`.
+
+Design for the map-edge and room-wall cases (reviewed with Fable): the margin becomes `{left, right}` per frame.
+`psx::present::guestProjectionPlan` takes each side's fillable extent from a title policy beside
+`presentationAspect` (X4: layer 0 camera x against its bounds) and clamps it to `[0, 2M]` with
+`left + right <= 2M`. The plan's scalar `presentationHorizontalMargin` goes away. The record canvas is
+`buffer + left + right` wide with the display buffer at its VRAM columns, so a camera at a bound shows the room's
+far side instead of the void, and a room narrower than the wide view gives a narrower canvas, which the presenter
+pillarboxes. The split is stamped into the `FrameRecord` at latch time so a record is presented with the split it
+was drawn with. Consumers take per-side values: `WideBackground` columns, `HudAnchor::shiftPacket`,
+`ScreenWindow::horizontal`, `activity_window` boxes, `RecordReadBack::captured`.
