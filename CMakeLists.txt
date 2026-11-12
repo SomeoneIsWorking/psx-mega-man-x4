@@ -38,8 +38,4 @@ if(NOT TARGET zstd::libzstd_shared)
 endif()
 find_package(Threads REQUIRED)
 
-# libchdr comes from Beetle PSX nested under psxport.
-add_subdirectory(${PSXPORT_DIR}/vendor/beetle-psx/deps/libchdr
-                 ${CMAKE_BINARY_DIR}/libchdr_build EXCLUDE_FROM_ALL)
-
 include(cmake/port.cmake)
