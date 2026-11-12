@@ -464,7 +464,7 @@ bool Service::change(uint32_t handle) {
                 core_.r[29],
                 core_.pc,
                 core_.r[31]);
-  thread.fiber->resume();
+  resumeFiber(thread);
   parkUpdateTasksWhileOverBudget(target);
   thread.regs = static_cast<R3000 &>(core_);
   activeSlot_ = 0;
@@ -492,8 +492,16 @@ void Service::parkUpdateTasksWhileOverBudget(int slot) {
     updateTasksParked_ = false;
     static_cast<R3000 &>(core_) = thread.regs;
     activeSlot_ = slot;
-    thread.fiber->resume();
+    resumeFiber(thread);
   }
+}
+
+void Service::resumeFiber(Thread &thread) {
+  const uint32_t resumer = core_.active_native_address;
+  core_.active_native_address = thread.activeNativeAddress;
+  thread.fiber->resume();
+  thread.activeNativeAddress = core_.active_native_address;
+  core_.active_native_address = resumer;
 }
 
 bool Service::runUpdateTasks(const std::function<void()> &call) {

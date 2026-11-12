@@ -88,6 +88,8 @@ private:
     // Stack top from OpenTh; the stack grows down, so a resumed sp above it is foreign.
     uint32_t stackTop = 0;
     R3000 regs{};
+    // The task is its own guest root: the natives on its guest stack, never main's ChangeTh.
+    uint32_t activeNativeAddress = 0;
     // Consecutive over-budget turns since the task last finished a frame or reached a field wait.
     uint32_t budgetTurns = 0;
     std::unique_ptr<Coro> fiber;
@@ -137,6 +139,8 @@ private:
   void reportSwitchCensus() const;
   // Main side of ChangeTh: an over-budget turn parks UpdateTasks for the field, then resumes the same task.
   void parkUpdateTasksWhileOverBudget(int slot);
+  // Runs the task's fiber with its own native nesting, so the guest's interrupts reach task code.
+  void resumeFiber(Thread &thread);
 };
 
 void install(Game &game);
