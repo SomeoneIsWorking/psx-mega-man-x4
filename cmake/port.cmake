@@ -61,7 +61,6 @@ set_target_properties(megamanx4_seam PROPERTIES CXX_STANDARD 20 CXX_STANDARD_REQ
 target_include_directories(megamanx4_seam PRIVATE ${X4_TITLE_DIRS})
 # Links only for include directories; an OBJECT library has no link step.
 target_link_libraries(megamanx4_seam PRIVATE psxport)
-target_compile_options(megamanx4_seam PRIVATE -g)
 
 
 psxport_add_product(
@@ -81,5 +80,5 @@ set_target_properties(megamanx4_port PROPERTIES
 
 target_include_directories(megamanx4_port PRIVATE ${X4_TITLE_DIRS})
 
-target_compile_options(megamanx4_port PRIVATE -O2 -g
+target_compile_options(megamanx4_port PRIVATE
   ${SDL3_CFLAGS_OTHER} ${FREETYPE_CFLAGS_OTHER})
