@@ -2,6 +2,9 @@
 // camera_layers.h - the parallax layers' camera rules (SLUS_005.61 mode tables 0x800F3140 / 0x800F3164, FUN_80027344).
 #pragma once
 
+#include "title/player_object.h"
+
+#include <array>
 #include <cstdint>
 
 class Core;
@@ -14,6 +17,14 @@ inline constexpr std::uint32_t kLastLayerUpdate = 0x800281E8u;
 // Columns layer `layer`'s retail packets move so that, with the 4:3 window `viewOffset` columns right of the guest
 // camera, the layer is drawn as at camera x + viewOffset: viewOffset - (scroll(x + viewOffset) - scroll(x)).
 int layerShift(Core &core, int layer, int viewOffset);
+
+// layerShift of every layer, layer 0's always 0.
+using LayerShifts = std::array<int, guest::kCameraLayerCount>;
+LayerShifts layerShifts(Core &core, int viewOffset);
+// The shift of an object's layer byte; a screen-space object (negative) does not move.
+inline int shiftOf(const LayerShifts &shifts, int layer) {
+  return layer >= 0 && layer < static_cast<int>(shifts.size()) ? shifts[static_cast<std::size_t>(layer)] : 0;
+}
 
 // A layer's loop blocks (+0x4D first, +0x4E last): its map repeats between them. FUN_8002771C starts every layer on
 // the whole map (0 and the row width - 1), so only a stage object that set other loop blocks makes it repeat.

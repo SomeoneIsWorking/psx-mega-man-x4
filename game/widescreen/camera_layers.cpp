@@ -81,6 +81,14 @@ int layerShift(Core &core, int layer, int viewOffset) {
   return viewOffset - (*viewed - *now);
 }
 
+LayerShifts layerShifts(Core &core, int viewOffset) {
+  LayerShifts shifts{};
+  for (std::size_t layer = 0; layer < shifts.size(); ++layer) {
+    shifts[layer] = layerShift(core, static_cast<int>(layer), viewOffset);
+  }
+  return shifts;
+}
+
 LoopBlocks::LoopBlocks(Core &core, int layer)
     : first_(static_cast<int>(core.mem_r8(layerAddress(layer) + kLoopFirstBlock))),
       last_(static_cast<int>(core.mem_r8(layerAddress(layer) + CameraLayerOffsets::kMapRightBlock))),

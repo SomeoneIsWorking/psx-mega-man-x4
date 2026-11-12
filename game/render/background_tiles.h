@@ -3,6 +3,7 @@
 // Retail draws 21 x 16 tile sprites per layer from a 32 x 32 cell ring; this owner adds the columns the margin shows.
 #pragma once
 
+#include "camera_layers.h"
 #include "guest_widescreen_projection.h"
 
 #include <array>
@@ -73,12 +74,9 @@ struct LayerPass {
   std::uint32_t firstRetailSprite;
 };
 
-// Columns each layer's picture moves under the view camera (WidescreenController::layerShift), layer 0's always 0.
-using LayerShifts = std::array<int, 3>;
-
 class WideBackground {
 public:
-  WideBackground(psx::present::HorizontalMargins margins, const LayerShifts &shifts)
+  WideBackground(psx::present::HorizontalMargins margins, const camera_layers::LayerShifts &shifts)
       : margins_(margins), shifts_(shifts) {}
 
   // Writes the margin columns of the three layers' rings from their block maps: a looping layer wraps as
@@ -92,7 +90,7 @@ private:
   psx::present::HorizontalMargins layerMargins(int layer) const;
 
   psx::present::HorizontalMargins margins_;
-  LayerShifts shifts_;
+  camera_layers::LayerShifts shifts_;
 };
 
 } // namespace x4::background

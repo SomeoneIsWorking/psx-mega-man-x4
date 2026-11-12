@@ -13,7 +13,7 @@ namespace x4::hud {
 namespace {
 
 void hudPass(Core *core) {
-  const ArenaPositions before = HudAnchor::positions(*core);
+  const arena::Positions before = arena::positions(*core);
   psx::cpu::callOriginalResumingToReturn(*core, "hud::hudPass original", kHudPass, core->r[31]);
   session(*core).coop.drawHud(*core);
   HudAnchor{session(*core).widescreen.windows(*core).drawn}.anchor(*core, before);

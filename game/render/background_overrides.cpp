@@ -21,7 +21,7 @@ void original(Core *core, std::uint32_t address, const char *owner) {
 
 WideBackground wideBackground(Core &core) {
   const WidescreenController &widescreen = session(core).widescreen;
-  return {widescreen.windows(core).drawn, {0, widescreen.layerShift(core, 1), widescreen.layerShift(core, 2)}};
+  return {widescreen.windows(core).drawn, widescreen.layerShifts(core)};
 }
 
 void drawLayer(Core *core) {

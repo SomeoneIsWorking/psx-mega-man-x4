@@ -1,5 +1,6 @@
 #pragma once
 
+#include "camera_layers.h"
 #include "guest_widescreen_projection.h"
 #include "view_bounds.h"
 
@@ -34,8 +35,8 @@ public:
   psx::present::RecordWindows windows(Core &core) const;
   // The camera layers moved (after FUN_800281E8): the view of the frame now being drawn.
   void stepView(Core &core);
-  // Columns layer `layer`'s retail packets and objects move in the frame being drawn (camera_layers::layerShift).
-  int layerShift(Core &core, int layer) const;
+  // Columns each layer's retail packets and objects move in the frame being drawn (camera_layers::layerShifts).
+  camera_layers::LayerShifts layerShifts(Core &core) const;
   // The frame's ordering table went to the GPU; its record is sealed with this frame's view.
   void submitFrame(Core &core);
   // The view and picture beyond the buffer of the frame last submitted.

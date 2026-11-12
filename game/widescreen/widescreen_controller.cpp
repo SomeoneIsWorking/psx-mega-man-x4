@@ -109,8 +109,8 @@ void WidescreenController::stepView(Core &core) {
   view_ = view_bounds::nextView(core, view_, plan_.widescreen() ? plan_.presentationHorizontalMargin : 0);
 }
 
-int WidescreenController::layerShift(Core &core, int layer) const {
-  return camera_layers::layerShift(core, layer, view_.offset);
+camera_layers::LayerShifts WidescreenController::layerShifts(Core &core) const {
+  return camera_layers::layerShifts(core, view_.offset);
 }
 
 void WidescreenController::submitFrame(Core &core) {

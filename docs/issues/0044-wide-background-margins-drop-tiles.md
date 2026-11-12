@@ -154,7 +154,16 @@ into the same viewport (`disp=…,3424,1920 viewport=0,3,3840,2153`); the left s
 from 3947 to 3980 with no step at the handoff (`a_motion.txt`, `a_3940.png`, `a_3960.png`, `a_3980.png`,
 `b_3940.png` with the HUD whole).
 
+Layer-bound objects (2026-11-13, RE in `scratch/bugs-1112/re/objdraw2`, `objdraw3`): the draw pass `0x80023DB8` places
+objects through four draws that subtract the scroll of the layer named by the object's s8 background byte: the sprite
+builder `0x80024334` and X's armor parts `0x8002588C` (BaseObj `+0x14`), and the quad draws `0x80024920` / `0x80024B9C`
+(QuadObj `+0x37`, chosen by bit 1 of the object's first byte). All four write into the scratchpad arenas `0x1F800100`
+/ `0x1F800104`. `layer_objects` wraps each: the packets written during the call move by `camera_layers::shiftOf` of
+that layer, the same shift `WideBackground::drawLayer` gives the layer's tiles; `VisibilityCull` adds it to the
+object's screen x (`presentedCull`). On report `-154132`'s pad the layer-2 objects are quad pool slots 0-2
+(`0x801435B0`, `+0x60`, `+0xC0`), the stage 0 searchlight beams, with shifts 7 -> 0 over 3920-3941. A/B at pad frames
+3930, 3936 and 3941 (`pb/ab_*.png`, top without the override, bottom with it): only beam pixels differ, by 7, 6 and 4
+columns, and the sky is identical, so the beams now hold their place on layer 2.
+
 Still open:
-- Objects bound to layer 1/2 (`VisibilityCull::layerFor`) are not moved with their layer yet; their draw needs an owner
-  that moves their packets by `layerShift` (cull follows once draw does).
 - Report 5/10 part-0 checkpoint warp and the 1,000-sprite arena (reports 6, 8) not started.

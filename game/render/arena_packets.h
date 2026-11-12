@@ -1,0 +1,44 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// arena_packets.h - the SLUS_005.61 scratchpad packet arenas the object draw pass (0x80023DB8) fills, and moving
+// the packets a pass wrote into them.
+#pragma once
+
+#include <array>
+#include <cstdint>
+#include <optional>
+
+class Core;
+
+namespace x4::arena {
+
+// Scratchpad next-free pointers of the packet arenas, set @ 0x80023DF4..0x80023E5C: polygons and sprites (0x100),
+// draw modes (0x104), sprites (0x108), draw modes (0x10C) and flat quads (0x110, the gauge bars @ 0x80025588).
+inline constexpr std::array<std::uint32_t, 5> kCursors = {
+    0x1F800100u, 0x1F800104u, 0x1F800108u, 0x1F80010Cu, 0x1F800110u};
+
+using Positions = std::array<std::uint32_t, kCursors.size()>;
+
+// A GP0 packet in an arena, by its guest address.
+struct Packet {
+  std::uint32_t address;
+};
+
+Positions positions(Core &core);
+// The packet after `packet` in its arena, from its tag's word count.
+Packet nextPacket(Core &core, Packet packet);
+// The leftmost vertex x of a polygon or rectangle packet; none for any other command.
+std::optional<int> leftmostX(Core &core, Packet packet);
+// Moves every vertex of a polygon or rectangle packet `dx` columns; any other command is left alone.
+void shiftX(Core &core, Packet packet, int dx);
+
+// Calls `visit(packet)` for each packet the arenas received since `before`.
+template <typename Visit> void forEachSince(Core &core, const Positions &before, Visit visit) {
+  const Positions after = positions(core);
+  for (std::size_t i = 0; i < kCursors.size(); ++i) {
+    for (Packet packet{before[i]}; packet.address < after[i]; packet = nextPacket(core, packet)) {
+      visit(packet);
+    }
+  }
+}
+
+} // namespace x4::arena

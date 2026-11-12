@@ -3,6 +3,7 @@
 // Every retail cull is `(u16)(v + A) <u B`, the box [-A, B-A); at margin 0 it is the retail compare bit for bit.
 #pragma once
 
+#include "camera_layers.h"
 #include "guest_widescreen_projection.h"
 #include "player_object.h"
 
@@ -99,11 +100,13 @@ struct ScreenCoordinate {
 // Recovers an object screen position, decides the cull and publishes the flag.
 class VisibilityCull {
 public:
-  // The presented columns each side (WidescreenController::margins); none at 4:3 or with widescreen off.
-  explicit VisibilityCull(psx::present::HorizontalMargins margins) : margins_(margins) {}
+  // The drawn columns each side (WidescreenController::windows) and the columns each layer's objects are drawn moved
+  // (WidescreenController::layerShifts); none at 4:3 or with widescreen off.
+  VisibilityCull(psx::present::HorizontalMargins margins, const camera_layers::LayerShifts &shifts)
+      : margins_(margins), shifts_(shifts) {}
   // The retail box: what gameplay reads.
   static VisibilityCull retail() {
-    return VisibilityCull{psx::present::HorizontalMargins{}};
+    return VisibilityCull{psx::present::HorizontalMargins{}, camera_layers::LayerShifts{}};
   }
 
   psx::present::HorizontalMargins margins() const {
@@ -111,8 +114,10 @@ public:
   }
 
   static LayoutOffsets offsetsFor(ObjectLayout layout);
+  // The camera layer the object is placed against, -1 for screen space (its s8 background byte).
+  static int layerOf(Core &core, std::uint32_t object, ObjectLayout layout);
 
-  // A negative background byte means screen space; otherwise the layer scroll is subtracted.
+  // A negative background byte means screen space; otherwise the layer scroll is subtracted and its shift added.
   ScreenCoordinate screenX(Core &core, std::uint32_t object, ObjectLayout layout) const;
   ScreenCoordinate screenY(Core &core, std::uint32_t object, ObjectLayout layout) const;
 
@@ -125,11 +130,14 @@ public:
   void publishOnScreen(Core &core, std::uint32_t object, bool onScreen) const;
 
 private:
-  int layerFor(Core &core, std::uint32_t object, ObjectLayout layout) const;
   std::uint32_t scrollBits(Core &core, int layer, std::uint32_t field) const;
 
   psx::present::HorizontalMargins margins_;
+  camera_layers::LayerShifts shifts_;
 };
+
+// The cull of what the frame presents: its drawn columns and layer shifts.
+VisibilityCull presentedCull(Core &core);
 
 // One row per flag-writing cull owner; the adapters take slack from here. The sites that return an
 // off-screen verdict to gameplay (0x8002B160, 0x8002B1E8, 0x800B8490) are widened by activity_window.h, not here.

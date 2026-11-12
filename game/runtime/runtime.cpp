@@ -13,6 +13,7 @@
 #include "gpu_timeout.h"
 #include "guest_execution.h"
 #include "hud_overrides.h"
+#include "layer_objects.h"
 #include "movie_cleanup.h"
 #include "music_stream.h"
 #include "native_overrides.h"
@@ -86,6 +87,7 @@ void Runtime::registerOverrides(Game &game) {
   view_bounds::registerOverrides(game.core);
   background::registerOverrides(game.core);
   hud::registerOverrides(game.core);
+  layer_objects::registerOverrides(game.core);
   sequence_skip::registerOverrides(game.core);
   coop::registerOverrides(game.core);
   native_overrides::install(game.core);

@@ -34,7 +34,9 @@ set(SEAM_SRC
   game/render/gpu_timeout.cpp
   game/render/background_tiles.cpp
   game/render/background_overrides.cpp
+  game/render/arena_packets.cpp
   game/render/hud_anchor.cpp
+  game/render/layer_objects.cpp
   game/render/hud_overrides.cpp
   game/input/sequence_skip.cpp
   game/input/sequence_skip_overrides.cpp

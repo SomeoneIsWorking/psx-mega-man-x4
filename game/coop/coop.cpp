@@ -2,6 +2,7 @@
 
 #include "enhancement_gate.h"
 #include "enhancements.h"
+#include "layer_objects.h"
 #include "player_object.h"
 #include "stage_warp.h"
 #include "vram_rect_queue.h"
@@ -47,8 +48,7 @@ constexpr std::uint32_t kPlayerState = 0x800311ECu;
 constexpr std::uint32_t kShotsUpdate = 0x80021340u;
 constexpr std::uint32_t kGlowsUpdate = 0x80021D84u;
 constexpr std::uint32_t kTrailsUpdate = 0x80021CC8u;
-// Draw pass pieces (0x80023DB8): the sprite builder, X's armor parts, and the pools it walks.
-constexpr std::uint32_t kSpriteBuilder = 0x80024334u;
+// Draw pass pieces (0x80023DB8): X's armor parts and the pools it walks.
 constexpr std::uint32_t kArmorParts = 0x800257BCu;
 constexpr std::uint32_t kSecondBody = guest::kEntityAddress;
 constexpr std::array<std::uint32_t, 2> kGlows{0x8013E470u, 0x8013E4C0u};
@@ -452,7 +452,7 @@ void Coop::drawRemapped(Core &core, std::uint32_t object, std::uint32_t link) {
   const bool playerTiles = (tile >> 8) == kPlayerTilePage && (tile & 0xFFu) < kTileRowsShift;
   core.mem_w16(object + kTileWord, playerTiles ? static_cast<std::uint16_t>(tile + kTileRowsShift) : tile);
   core.mem_w16(object + kClutWord, playerTwoClut(clut));
-  call(core, {kSpriteBuilder, object}, link);
+  call(core, {layer_objects::kSpriteBuilder, object}, link);
   core.mem_w16(object + kTileWord, tile);
   core.mem_w16(object + kClutWord, clut);
 }

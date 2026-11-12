@@ -80,7 +80,7 @@ void publishOutside(Core &core, bool inside) {
 }
 
 bool insideLifetime(Core &core, std::uint32_t object, const cull::Slack &slack) {
-  const cull::VisibilityCull window{presentedMargins(core)};
+  const cull::VisibilityCull window = cull::presentedCull(core);
   const cull::ScreenCoordinate x = window.screenX(core, object, cull::ObjectLayout::BaseObject);
   const cull::ScreenCoordinate y = window.screenY(core, object, cull::ObjectLayout::BaseObject);
   return window.inside(x.value, y.value, slack.halfWidth, slack.halfHeight);
@@ -103,7 +103,7 @@ void outsideLooseLayer0(Core *core) {
   const std::uint32_t object = core->r[kArg0];
   const int x = static_cast<std::int16_t>(core->mem_r16(object + cull::kPositionIntegerX) - core->mem_r16(kCameraX));
   const int y = static_cast<std::int16_t>(core->mem_r16(object + cull::kPositionIntegerY) - core->mem_r16(kCameraY));
-  const cull::VisibilityCull window{presentedMargins(*core)};
+  const cull::VisibilityCull window = cull::presentedCull(*core);
   publishOutside(*core, window.inside(x, y, kLifetimeSlack, kLifetimeSlack));
 }
 
