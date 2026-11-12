@@ -44,3 +44,21 @@ Two separate gaps in `game/render/background_tiles.cpp:WideBackground::drawLayer
 ## Captures held back
 
 The README carries no 16:9 gameplay stills, comparison or clip until this is fixed (2026-10-29 README media pass).
+
+## User reports 2026-11-12
+
+Bug reports `20261112-153948` (stage start: left margin black past layer 0's map edge), `-154058` (a boss cut
+vertically at canvas x 58, guest x -16, the first retail tile column), `-154132` and `-154209` (black margin
+blocks), `-154304` (boss room: the margins past the room walls). User decision: a margin that cannot be filled is
+shifted or clamped in host presentation only (guest camera and state stay retail), otherwise pillarboxed; rendering
+the area for real is preferred.
+
+Leads, not yet proven on those screens:
+
+- Retail `0x80027344` refills ring strips of every layer looping between map columns `+0x4D` and `+0x4E` of the
+  layer's camera; `refillRing` writes 0 past the map instead. Looping parallax margins the same way changed no
+  frame of the stage-start recording (pad frames 2706-3400), so it is not yet shown to own any reported screen.
+- The camera bounds are `+0x1C..+0x22` of each layer (`CameraLayerOffsets`); a clamp or pillarbox keys on them.
+- The reports' pad recordings stop reproducing their screens on HEAD: the widened placement scans
+  (`activity_window.*`) change enemy timing, and `PSXPORT_LOAD_STATE` crashes (issue 0046), so these screens need
+  a warp to their room first.
