@@ -92,3 +92,17 @@ Still open:
 - The boss-room pillarbox (`-154304`) and the cut boss (`-154058`) need the part-0 checkpoint arrival.
 - Arena capacity (`-154132`, `-154209`) is unchanged; a wider right side draws more margin sprites against the
   1,000 cap.
+
+Motion judged (2026-11-13, `scratch/bugs-1112/mot`, every frame, report `-154132`'s pad): X4 presents no
+in-betweens (`[playcheck] records: in_betweens=0`), so each present carries its own frame's split. With the
+left side bounded by layer 2 (`scroll = round(camera / 2)`), the camera scroll 40 -> 153 at 2 px/frame (pad frames
+3925-4000) moves the floor 1 px/frame, then 1,2,1,1,2 near x 148 where the bound hands back to the margin. The walk
+40 -> 22 (3054-3066) moves it -2,-1,-1,-1,-2,-1,-1,0. That is judder, so `2f699c7` must not ship as is.
+
+A uniform presentation shift cannot keep the layers' parallax. Bounded by the camera window alone, the world would
+stand still near a bound while layer 2 drifts the other way at half the camera's speed. The fix that keeps both
+is a host view camera: inside the shift zone every layer is drawn as at the clamped camera, so retail's layer
+packets move by `s - (scroll_l(v) - scroll_l(x))` where `v` is the clamped camera. That needs each layer's scroll
+rule from its mode function (`kCameraModeFnTable` 0x800F3134; layer 2 is mode 4) recovered, not a measured ratio.
+A layer past its map end then shows retail's own wrap (`FUN_80027344`: a block below `+0x4D` maps to
+`+0x4E`'s side and back).
