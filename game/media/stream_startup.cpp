@@ -116,8 +116,7 @@ bool startNativeCdStream(Core &core, const StreamRequest &request, FieldService 
   game.cd.sec_len = 0;
   game.cd.sec_lba = -1;
   game.cd.stream_active = 1;
-  game.cd.stream_t0_ns = 0;
-  game.cd.stream_delivered = 0;
+  game.cd.stream_origin.reset();
   game.xa.setLoc(request.lba);
   game.xa.start();
   controller.beginRead(request.lba);
