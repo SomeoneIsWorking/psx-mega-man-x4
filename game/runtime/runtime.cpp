@@ -1,5 +1,6 @@
 #include "runtime/runtime.h"
 
+#include "activity_window.h"
 #include "background_overrides.h"
 #include "bios_threads.h"
 #include "coop.h"
@@ -76,6 +77,7 @@ void Runtime::registerOverrides(Game &game) {
   stream_startup::registerOverride(game.core);
   title_quad::registerOverride(game.core);
   cull::registerOverrides(game.core);
+  activity::registerOverrides(game.core);
   background::registerOverrides(game.core);
   hud::registerOverrides(game.core);
   sequence_skip::registerOverrides(game.core);

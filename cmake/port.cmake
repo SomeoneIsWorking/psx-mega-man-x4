@@ -43,6 +43,7 @@ set(SEAM_SRC
   game/render/cull_overrides.cpp
   game/render/vram_rect_queue.cpp
   game/widescreen/widescreen_controller.cpp
+  game/widescreen/activity_window.cpp
   game/ui/title_quad.cpp
   game/execution/guest_execution.cpp
   game/execution/native_overrides.cpp

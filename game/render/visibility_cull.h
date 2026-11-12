@@ -128,7 +128,7 @@ private:
 };
 
 // One row per flag-writing cull owner; the adapters take slack from here. The sites that return an
-// off-screen verdict to gameplay (0x8002B160, 0x8002B1E8, 0x800B8490) stay retail and have no row.
+// off-screen verdict to gameplay (0x8002B160, 0x8002B1E8, 0x800B8490) are widened by activity_window.h, not here.
 struct MeasuredSite {
   std::uint32_t address;
   int halfWidth;  // per-side slack; -1 when taken from a guest register
