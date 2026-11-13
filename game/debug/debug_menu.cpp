@@ -12,20 +12,28 @@ namespace x4 {
 
 DebugMenu::DebugMenu() {
   warp({
-      .levels = {"stage", "part"},
+      .levels = {"stage", "part", "checkpoint"},
       .places =
-          [](Core &) {
+          [](Core &core) {
             std::vector<psx::game::WarpPlace> stages;
             for (std::uint32_t stage = 0; stage < StageWarp::kStageNames.size(); ++stage) {
               psx::game::WarpPlace place{.name = StageWarp::kStageNames[stage]};
               for (std::uint32_t part = 0; part < StageWarp::kPartCount; ++part) {
-                place.places.push_back({
-                    .name = lucent::format("part {}", part),
-                    .arrive =
-                        [stage, part](Core &core) {
-                          return session(core).stageWarp.arm(stage, part);
-                        },
-                });
+                psx::game::WarpPlace partPlace{.name = lucent::format("part {}", part)};
+                const std::uint32_t checkpoints = StageWarp::checkpointCount(core, stage, part);
+                for (std::uint32_t checkpoint = 0; checkpoint < checkpoints; ++checkpoint) {
+                  const StageWarp::Arrival arrival{.stage = stage, .part = part, .checkpoint = checkpoint};
+                  partPlace.places.push_back({
+                      .name = lucent::format("checkpoint {}", checkpoint),
+                      .arrive =
+                          [arrival](Core &core) {
+                            return session(core).stageWarp.arm(arrival);
+                          },
+                  });
+                }
+                if (checkpoints > 0) {
+                  place.places.push_back(std::move(partPlace));
+                }
               }
               stages.push_back(std::move(place));
             }
