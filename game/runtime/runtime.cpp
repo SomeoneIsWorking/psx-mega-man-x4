@@ -109,6 +109,10 @@ std::unique_ptr<psx::game::FrameDriver> Runtime::createFrameDriver(Game &game) {
                                               state.stageWarp);
 }
 
+psx::state::NativeStatePort *Runtime::nativeState(Core &core) const {
+  return &session(core).titleState;
+}
+
 void Runtime::deliverPad(Core &core, const psx::input::PadDelivery &delivery) {
   pad_.deliver(core, delivery);
 }

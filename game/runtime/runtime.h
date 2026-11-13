@@ -28,6 +28,7 @@ public:
   const psx::game::TitleDebugMenu &debugMenu() const override {
     return debugMenu_;
   }
+  psx::state::NativeStatePort *nativeState(Core &core) const override;
   void reportRun(Core &core) const override;
   const psx::game::HostIdentity *hostIdentity() const override;
 

@@ -9,6 +9,7 @@
 #include "music_stream.h"
 #include "sequence_skip.h"
 #include "stage_warp.h"
+#include "title_state.h"
 #include "widened_objects.h"
 #include "widescreen_controller.h"
 
@@ -23,11 +24,13 @@ namespace x4 {
 class Session final : public psx::game::TitleSessionState {
 public:
   Session(Core &core, const psx::cd::StockLibcd &stockLibcd)
-      : libcd(stockLibcd), biosThreads(core), movieCleanup(core), musicStream(core), stageWarp(core) {}
+      : libcd(stockLibcd), biosThreads(core), titleState(biosThreads), movieCleanup(core), musicStream(core),
+        stageWarp(core) {}
 
   // The runtime's libcd; the title's CD wrappers call its bodies.
   const psx::cd::StockLibcd &libcd;
   bios_threads::Service biosThreads;
+  TitleState titleState;
   fast_wait::State fastWait;
   movie_cleanup::State movieCleanup;
   music_stream::State musicStream;

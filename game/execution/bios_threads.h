@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <string>
 #include <string_view>
 
 #include "r3000.h"
@@ -11,6 +12,11 @@
 class Coro;
 class Game;
 class Core;
+
+namespace psx::platform {
+class BlobReader;
+class BlobWriter;
+} // namespace psx::platform
 
 namespace x4::bios_threads {
 // The three BIOS-thread thunks of SLUS_005.61.
@@ -26,8 +32,6 @@ constexpr int kThreadCount = 4;
 // Over-budget turns a task may take in one frame before the run reports a guest loop.
 constexpr uint32_t kMaxTurnFields = 512u;
 
-using EntryRunner = std::function<void(Core &, uint32_t)>;
-
 // Per-Core BIOS-thread service under retail func_80012600, which still picks the task and calls ChangeTh.
 
 // The guest passes a2 = 0 to OpenTh and its code is $gp-relative, so a zero request inherits the creator's gp.
@@ -39,7 +43,7 @@ using EntryRunner = std::function<void(Core &, uint32_t)>;
 
 class Service {
 public:
-  explicit Service(Core &core, EntryRunner entryRunner = {});
+  explicit Service(Core &core);
   ~Service();
 
   Service(const Service &) = delete;
@@ -73,6 +77,13 @@ public:
   [[nodiscard]] bool isOpen(uint32_t handle) const;
   [[nodiscard]] bool isDone(uint32_t handle) const;
 
+  // Machine-state section body. Refuses unless every task is parked at the end of a turn, where its guest
+  // registers and resume pc are its whole state.
+  bool save(psx::platform::BlobWriter &out, std::string &error) const;
+  // Stages the tasks; `adoptStaged` replaces the live ones once every section is restored.
+  bool load(psx::platform::BlobReader &in, std::string &error);
+  void adoptStaged();
+
   // Run-end task census, reported through x4::Runtime::reportRun.
   void reportCensus(std::string_view phase) const;
 
@@ -92,6 +103,14 @@ private:
     uint32_t activeNativeAddress = 0;
     // Consecutive over-budget turns since the task last finished a frame or reached a field wait.
     uint32_t budgetTurns = 0;
+    // The turn loop's continuation: the activation's return address and the pc the next turn resumes at.
+    bool started = false;
+    uint32_t returnAddress = 0;
+    uint32_t resumePc = 0;
+    // The entry reached its return address; the slot stays open until the guest closes it.
+    bool retired = false;
+    // Parked in the turn loop between turns rather than inside a field wait's native frame.
+    bool parkedAtTurnEnd = false;
     std::unique_ptr<Coro> fiber;
   };
 
@@ -119,8 +138,9 @@ private:
   };
 
   Core &core_;
-  EntryRunner entryRunner_;
   std::array<Thread, kThreadCount> threads_{};
+  std::array<Thread, kThreadCount> staged_{};
+  bool hasStaged_ = false;
   R3000 mainRegs_{};
   int activeSlot_ = 0;
   TurnCensus turnCensus_{};
@@ -133,7 +153,9 @@ private:
 
   [[nodiscard]] static int slotForHandle(uint32_t handle);
   // Host owner of one task body: dispatch, park on each field boundary, resume at the typed exit PC.
-  void runGuestEntry(Core &core, uint32_t entry);
+  void runTask(int slot);
+  // Ends a turn: the next one resumes at `resumePc` with the registers the park saved.
+  void parkAtTurnEnd(Thread &task, uint32_t resumePc);
   void startFiber(int slot);
   void finishDeferredClose(int slot);
   void reportSwitchCensus() const;

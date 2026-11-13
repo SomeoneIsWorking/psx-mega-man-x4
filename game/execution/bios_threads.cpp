@@ -11,7 +11,10 @@
 #include "runtime/session.h"
 #include "vsync_sync.h"
 
+#include "blob_codec.h"
+
 #include <cstdlib>
+#include <format>
 #include <lucent/log.h>
 #include <string_view>
 #include <utility>
@@ -59,24 +62,32 @@ void Service::reportCensus(std::string_view phase) const {
   reportSwitchCensus();
 }
 
-void Service::runGuestEntry(Core &core, uint32_t entry) {
-  // Captured once: OpenTh gets no return address, and a field boundary resumes after the guest `jal`.
-  // Real task returns (`jr $ra` at 0x800182E0, 0x800185F0) land on this address.
-  const std::uint32_t taskReturnAddress = core.r[31];
-
-  std::uint32_t resumeAddress = entry;
-  bool suspended = false;
+void Service::runTask(int slot) {
+  Thread &task = threads_[slot];
+  Core &core = core_;
+  const std::uint32_t entry = task.entry;
+  if (task.retired) {
+    return;
+  }
+  if (!task.started) {
+    // Captured once: OpenTh gets no return address, and a field boundary resumes after the guest `jal`.
+    // Real task returns (`jr $ra` at 0x800182E0, 0x800185F0) land on this address.
+    task.returnAddress = core.r[31];
+    task.resumePc = entry;
+  }
   for (;;) {
     // First turn dispatches the entry; later turns resume mid-function but stay attributed to `entry`.
     const psx::cpu::ExecutionResult result =
-        suspended ? psx::cpu::resumeGuestToReturn(core,
-                                                  psx::cpu::GuestCallSite{entry, taskReturnAddress},
-                                                  resumeAddress,
-                                                  psx::cpu::ExecutionBudget::currentTurn(core))
-                  : guest::dispatch(core, resumeAddress);
+        task.started ? psx::cpu::resumeGuestToReturn(core,
+                                                     psx::cpu::GuestCallSite{entry, task.returnAddress},
+                                                     task.resumePc,
+                                                     psx::cpu::ExecutionBudget::currentTurn(core))
+                     : guest::dispatch(core, task.resumePc);
+    task.started = true;
     ++turnCensus_.turns;
     if (result.returned()) {
       ++turnCensus_.retirements;
+      task.retired = true;
       lucent::info("x4-thread",
                    "retail task entry 0x{:08X} reached its activation's return address 0x{:08X} and "
                    "RETIRED after {} turn(s) ({} guest field-boundary resume(s), {} host-turn budget "
@@ -139,10 +150,8 @@ void Service::runGuestEntry(Core &core, uint32_t entry) {
                    turnCensus_.turns,
                    turnCensus_.budgetCycles,
                    turnCensus_.turns - turnCensus_.budgetResumes);
-      resumeAddress = result.guestPc;
-      suspended = true;
       // The field clock is owed, so park like a guest-authored field wait.
-      from(core).yieldToMain();
+      parkAtTurnEnd(task, result.guestPc);
       continue;
     }
     if (result.reason != psx::cpu::ExecutionExitReason::FrameBoundary &&
@@ -247,10 +256,15 @@ void Service::runGuestEntry(Core &core, uint32_t entry) {
     threads_[activeSlot_].budgetTurns = 0u;
     ++(result.reason == psx::cpu::ExecutionExitReason::FrameBoundary ? turnCensus_.fieldResumes
                                                                      : turnCensus_.yieldResumes);
-    resumeAddress = result.guestPc;
-    suspended = true;
-    from(core).yieldToMain();
+    parkAtTurnEnd(task, result.guestPc);
   }
+}
+
+void Service::parkAtTurnEnd(Thread &task, std::uint32_t resumePc) {
+  task.resumePc = resumePc;
+  task.parkedAtTurnEnd = true;
+  yieldToMain();
+  task.parkedAtTurnEnd = false;
 }
 
 namespace {
@@ -295,12 +309,7 @@ void change_thread(Core *core) {
 
 } // namespace
 
-Service::Service(Core &core, EntryRunner entryRunner)
-    : core_(core), entryRunner_(entryRunner ? std::move(entryRunner)
-                                            // The default runner is this owner so the census counts its own turns.
-                                            : EntryRunner{[this](Core &c, uint32_t entry) {
-                                                runGuestEntry(c, entry);
-                                              }}) {
+Service::Service(Core &core) : core_(core) {
   threads_[0].open = true;
 }
 
@@ -359,8 +368,7 @@ void Service::startFiber(int slot) {
   Thread &thread = threads_[slot];
   thread.fiber = std::make_unique<Coro>(core_.game->perf.clock());
   thread.fiber->start([this, slot] {
-    Thread &running = threads_[slot];
-    entryRunner_(core_, running.entry);
+    runTask(slot);
   });
 }
 
@@ -540,6 +548,83 @@ void Service::yieldToMain() {
   }
   running.regs = static_cast<R3000 &>(core_);
   running.fiber->yield();
+}
+
+bool Service::save(psx::platform::BlobWriter &out, std::string &error) const {
+  if (activeSlot_ != 0 || inUpdateTasks_ || updateTasksParked_) {
+    error = "a retail task is mid-turn inside UpdateTasks";
+    return false;
+  }
+  for (int slot = 1; slot < kThreadCount; ++slot) {
+    const Thread &task = threads_[slot];
+    if (task.closePending) {
+      error = std::format("task slot {} is closing", slot);
+      return false;
+    }
+    if (task.open && task.started && !task.retired && !task.parkedAtTurnEnd) {
+      error = std::format(
+          "task slot {} (entry 0x{:08X}) is parked inside a field wait at 0x{:08X}", slot, task.entry, task.regs.pc);
+      return false;
+    }
+  }
+  for (int slot = 1; slot < kThreadCount; ++slot) {
+    const Thread &task = threads_[slot];
+    out.boolean(task.open);
+    out.u32(task.entry);
+    out.u32(task.stackTop);
+    out.value(task.regs);
+    out.u32(task.activeNativeAddress);
+    out.u32(task.budgetTurns);
+    out.boolean(task.started);
+    out.u32(task.returnAddress);
+    out.u32(task.resumePc);
+    out.boolean(task.retired);
+  }
+  return true;
+}
+
+bool Service::load(psx::platform::BlobReader &in, std::string &error) {
+  for (int slot = 1; slot < kThreadCount; ++slot) {
+    Thread &task = staged_[slot];
+    task = Thread{};
+    task.open = in.boolean();
+    task.entry = in.u32();
+    task.stackTop = in.u32();
+    task.regs = in.value<R3000>();
+    task.activeNativeAddress = in.u32();
+    task.budgetTurns = in.u32();
+    task.started = in.boolean();
+    task.returnAddress = in.u32();
+    task.resumePc = in.u32();
+    task.retired = in.boolean();
+    task.parkedAtTurnEnd = task.started && !task.retired;
+  }
+  if (!in.ok()) {
+    error = "the task table is truncated";
+    return false;
+  }
+  hasStaged_ = true;
+  return true;
+}
+
+void Service::adoptStaged() {
+  if (!hasStaged_) {
+    return;
+  }
+  // The old fibers unwind on destruction; the restored tasks start fresh fibers that resume at their saved pc.
+  updateTasks_.reset();
+  inUpdateTasks_ = false;
+  updateTasksParked_ = false;
+  activeSlot_ = 0;
+  for (int slot = 1; slot < kThreadCount; ++slot) {
+    threads_[slot] = std::move(staged_[slot]);
+  }
+  hasStaged_ = false;
+  lucent::info("x4-thread",
+               "restored task slots: 0x{:08X} 0x{:08X} 0x{:08X}",
+               threads_[1].open ? threads_[1].entry : 0u,
+               threads_[2].open ? threads_[2].entry : 0u,
+               threads_[3].open ? threads_[3].entry : 0u);
 }
 
 bool Service::isOpen(uint32_t handle) const {

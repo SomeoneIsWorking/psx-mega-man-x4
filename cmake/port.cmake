@@ -18,6 +18,7 @@ set(X4_TITLE_DIRS
 set(SEAM_SRC
   game/runtime/runtime.cpp
   game/runtime/session.cpp
+  game/runtime/title_state.cpp
   game/frame/frame_driver.cpp
   game/frame/vsync_sync.cpp
   game/input/input_path.cpp
