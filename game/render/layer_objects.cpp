@@ -25,7 +25,7 @@ void drawShifted(Core &core, std::uint32_t address, const char *owner, cull::Obj
   if (shift == 0) {
     return;
   }
-  arena::forEachSince(core, before, [&](arena::Packet packet) {
+  arena::forEachObjectPieceSince(core, before, [&](arena::Packet packet) {
     arena::shiftX(core, packet, shift);
   });
 }

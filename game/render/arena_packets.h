@@ -31,7 +31,19 @@ std::optional<int> leftmostX(Core &core, Packet packet);
 // Moves every vertex of a polygon or rectangle packet `dx` columns; any other command is left alone.
 void shiftX(Core &core, Packet packet, int dx);
 
-// Calls `visit(packet)` for each packet the arenas received since `before`.
+// The object draws (0x80024334, 0x8002588C, 0x80024920, 0x80024B9C) put each piece in a slot of this many bytes of
+// the first arena whatever its command's length (cursor `+0x28` per piece); its draw mode goes to the second.
+inline constexpr std::uint32_t kObjectSlotBytes = 0x28u;
+
+// Calls `visit(packet)` for each object piece the first arena received since `before`.
+template <typename Visit> void forEachObjectPieceSince(Core &core, const Positions &before, Visit visit) {
+  const std::uint32_t end = positions(core)[0];
+  for (Packet packet{before[0]}; packet.address < end; packet.address += kObjectSlotBytes) {
+    visit(packet);
+  }
+}
+
+// Calls `visit(packet)` for each packet the arenas received since `before`, stepping by each tag's length.
 template <typename Visit> void forEachSince(Core &core, const Positions &before, Visit visit) {
   const Positions after = positions(core);
   for (std::size_t i = 0; i < kCursors.size(); ++i) {
