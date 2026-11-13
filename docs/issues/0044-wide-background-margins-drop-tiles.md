@@ -195,13 +195,26 @@ Proof (`scratch/arena`, report `-154132`'s pad, `warp 0/0/2`, judgement settings
 - Frames 2760-3000 every 60 (`w3_sheet.png`): no black block in either margin. `PSXPORT_DEBUG=x4-bg` logs every
   layer's margin (up to 96 sprites, retail up to 529) and groups retail left empty filled (`2 in 1 group`), and no
   walk ended with an undrawn host packet (a fault otherwise).
-- Guest RAM: a state at frame 3000 (`w3/A.bin`) loaded at 16:9 and at 4:3, RAM snapshotted each of the next 30
-  frames and paired by the retail field counter `0x80141BD8` (`ramproof.py`): no differing byte in the arena past
-  the retail count or in any field but x, the ring, the tails, the heads or the texture-page nodes. What differs is
-  the x of retail sprites the layer shift moves (16,284 bytes), the placement table at `0x800F4AD0` (60) and two
-  object records at `0x80142FC0` (150), both from the widened activity window.
-- The same psxport build draws Tomba 2's margins at `warp 13/0` (`scratch/arena/t2/t2_a.png`) and Spyro 1's
-  widened intro scene (`scratch/arena/s1/s1_0.png`).
+- Guest RAM: the layer shift of retail tiles, the layer shift of object pieces and the HUD anchor no longer write
+  guest packets; each names the packet with `HostPackets::moveX` and the walk draws it moved. A state at frame 3000
+  (`w3/A.bin`) loaded at 16:9 and at 4:3, main RAM and scratchpad snapshotted each of the next 30 frames and
+  paired by the retail field counter `0x80141BD8` (`ramproof2.py`, `m3/`, `m0/`): 7 addresses differ, all the
+  activity window. The placement table entries at `0x800F4AD0` and `0x800F4AD8` (spawned byte, placements at
+  x `0x0E50`, y `0x01B0`) and the object at `0x80142FC0` hold 1 / live at 16:9; at 4:3 the lifetime check
+  `0x8002B160`, called from the object's update at `0x800B57AC`, finds the object outside the retail box and clears
+  both spawned bytes on the first frame (store watch, `wl0/`). The same frame at 16:9 has no store: the widened box
+  keeps it. This is the activity window doing what `activity_window.*` is for (an enemy placed before it enters the
+  margin and retired where the widened view ends), so it stays: gameplay at a wide aspect differs from 4:3 only by
+  which placements are live.
+- A load draws what the save would have drawn next: the machine state carries the host packets (psxport GPU
+  section) and the wide view (`x4.tasks` v2; the view eases toward its bounds, so the camera alone does not give it
+  back). From `w5/A.bin`, the first walk after the load draws the 9 restored host packets and the moved tiles
+  (`otattr`), and its record has the HUD at the edge and the left margin drawn as in the saving run (`l11/`).
+- The same psxport build draws Tomba 2's margins at `warp 13/0` identically before and after the walk change (0
+  differing pixels, `scratch/arena/t2/`) and Spyro 1's widened intro scene (`scratch/arena/s1b/cmp.png`).
 
 Still open:
-- The first frame after a state load draws no margin: the pending host packets are not in the machine state.
+- The first two records after a load draw no column past x 320 (the right margin is black), though the restored view
+  and submitted picture are right (`l12/run.log`); from the third record on it is drawn. The loading run announces
+  `native picture ... native_width=256` before the load and `320` on the first frame after it. Not traced yet.
+- Co-op player 2's gauge (`coop/player_two_hud.cpp`) still moves its packets by guest writes.

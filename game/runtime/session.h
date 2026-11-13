@@ -25,8 +25,8 @@ namespace x4 {
 class Session final : public psx::game::TitleSessionState {
 public:
   Session(Core &core, const psx::cd::StockLibcd &stockLibcd)
-      : libcd(stockLibcd), biosThreads(core), titleState(biosThreads), movieCleanup(core), musicStream(core),
-        stageWarp(core) {}
+      : libcd(stockLibcd), biosThreads(core), titleState(biosThreads, widescreen), movieCleanup(core),
+        musicStream(core), stageWarp(core) {}
 
   // The runtime's libcd; the title's CD wrappers call its bodies.
   const psx::cd::StockLibcd &libcd;

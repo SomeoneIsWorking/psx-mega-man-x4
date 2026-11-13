@@ -14,7 +14,7 @@ Frame loop: owned. `x4::frame::FrameDriver` runs one iteration of gameMain `0x80
 | `createCatalog` | `game/runtime/catalog.*` | The one-title catalog: `SLUS_005.61` identity, disc key and one `x4::Runtime` |
 | `x4::Runtime` | `game/runtime/runtime.*` | The `GameRuntime`: crt0 and boot prefix, stock VSync/DMA-callback/libcd/pad bindings, every native override, session, frame driver, Record path, card identity, `warp`, run report |
 | `x4::Session`, `session` | `game/runtime/session.*` | Per-Core title state every owner composes; `stockCdSync`/`stockCdControl` |
-| `x4::TitleState` | `game/runtime/title_state.*` | The `x4.tasks` machine-state section (`GameRuntime::nativeState`): the task table `bios_threads::Service::save/load/adoptStaged` owns |
+| `x4::TitleState` | `game/runtime/title_state.*` | The `x4.tasks` machine-state section (`GameRuntime::nativeState`): the task table `bios_threads::Service::save/load/adoptStaged` owns, and the wide view (`WidescreenController::saveView/loadView`) |
 | `x4::frame::FrameDriver`, `bootPrefix` | `game/frame/frame_driver.*` | One retail field: armed warp, field service, draw prefix, `UpdateTasks`, suffix; a blocking movie or mid-frame task skips the prefix |
 | `deliverField`, `serveVSync` | `game/frame/vsync_sync.*` | The one per-field service (IRQ-0, pad, SPU, snapshot, commit) and libetc VSync `0x800E4DB0` |
 | `guest::dispatch`, `guest::call`, `callWithoutKnownReturn` | `game/execution/guest_execution.*` | Guest calls, a retail `jal` site (`CallSite`) and their measured return boundaries |
@@ -38,14 +38,14 @@ Frame loop: owned. `x4::frame::FrameDriver` runs one iteration of gameMain `0x80
 | `view_bounds` | `game/widescreen/view_bounds.*`, `view_overrides.*` | The host view camera, stepped after `FUN_800281E8`: the split from layer 0's clamp window, returning at `+0x47` per frame after a bound relaxes; the room and non-looping layers' maps limit the picture, which `psx::present::fitWindows` pillarboxes in place |
 | `camera_layers` | `game/widescreen/camera_layers.*` | Layer 1/2 scroll rules from the mode tables `0x800F3140`/`0x800F3164` (`layerShift`), loop blocks `+0x4D..+0x4E` and `FUN_80027344`'s wrap |
 | `VisibilityCull`, `WidenedObjects` | `game/render/visibility_cull.*`, `widened_objects.*`, `cull_overrides.*` | Retail cull box and the margin objects lent `on_screen` for the draw pass only; the widened box (`presentedCull`) takes the drawn columns and each layer's shift |
-| `arena` | `game/render/arena_packets.*` | The draw pass's scratchpad packet arenas: cursors, the packets written since a point, vertex x of a polygon or rectangle |
+| `arena` | `game/render/arena_packets.*` | The draw pass's scratchpad packet arenas: cursors, the packets written since a point, a packet's leftmost x, and `moveX`, which has the walk draw a packet moved (`HostPackets::moveX`) while guest RAM keeps retail's |
 | `layer_objects` | `game/render/layer_objects.*` | The four layer-relative object draws (`0x80024334`, `0x8002588C`, `0x80024920`, `0x80024B9C`): their packets move by the shift of the layer the object's background byte names; a sprite frame of no pieces draws nothing |
-| `WideBackground`, `MarginBatch`, `spliceMargins` | `game/render/background_tiles.*`, `background_overrides.*` | Each layer's retail sprites moved by its view shift; the margin tile columns built from the block map after the layer draw (`0x80026AA0`) and inserted as `HostPackets` after its splice (`0x80026894`), where retail would have linked them |
+| `WideBackground`, `MarginBatch`, `spliceMargins` | `game/render/background_tiles.*`, `background_overrides.*` | Each layer's retail sprites drawn moved by its view shift (`HostPackets::moveX`, guest RAM untouched); the margin tile columns built from the block map after the layer draw (`0x80026AA0`) and inserted as `HostPackets` after its splice (`0x80026894`), where retail would have linked them |
 | `draw_info` | `game/frame/draw_info.h` | The two retail DRAWINFO buffers: ordering-table slots and the DrawOTag root |
 | `HudAnchor` | `game/render/hud_anchor.*`, `hud_overrides.*` | The HUD pass: the retail HUD, player 2's gauge, then every packet moved to its screen edge |
 | `vram_rect` | `game/render/vram_rect_queue.*` | The eight-entry VRAM rectangle upload queue; `decompress` for an owner that uploads a player graphic itself |
 | `title_quad` | `game/ui/title_quad.*` | The white quad behind the MEGAMAN logo |
-| `WidescreenPolicy`, `WidescreenController` | `game/widescreen/widescreen_controller.*` | Requested aspect and the per-Core projection plan and cull margin |
+| `WidescreenPolicy`, `WidescreenController` | `game/widescreen/widescreen_controller.*` | Requested aspect, the per-Core projection plan and cull margin, and the wide view, which the machine state carries |
 | `StageWarp` | `game/debug/stage_warp.*` | The stage arrival through engine state 4, applied at a frame boundary |
 | `coop::Coop`, `coop::PlayerTwo` | `game/coop/coop.*`, `game/coop/player_two.*` | Drop-in player 2: pad-2 Start join/leave, the projected per-player blocks, player 2's tick pass, draw, VRAM upload, retried hits and the midpoint camera |
 | `coop::PlayerTwoHud` | `game/coop/player_two_hud.*` | Player 2's gauge: the retail HUD pieces' packets moved under player 1's, their tiles copied from the counterpart's UI texture |

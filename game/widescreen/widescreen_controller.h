@@ -1,8 +1,11 @@
 #pragma once
 
+#include "blob_codec.h"
 #include "camera_layers.h"
 #include "guest_widescreen_projection.h"
 #include "view_bounds.h"
+
+#include <string>
 
 class Core;
 
@@ -35,6 +38,10 @@ public:
   psx::present::RecordWindows windows(Core &core) const;
   // The camera layers moved (after FUN_800281E8): the view of the frame now being drawn.
   void stepView(Core &core);
+  // The view and the picture last submitted, for the machine state: the view eases toward its bounds, so the
+  // restored camera alone does not give it back.
+  void saveView(psx::platform::BlobWriter &out) const;
+  bool loadView(psx::platform::BlobReader &in, std::string &error);
   // Columns each layer's retail packets and objects move in the frame being drawn (camera_layers::layerShifts).
   camera_layers::LayerShifts layerShifts(Core &core) const;
   // The frame's ordering table went to the GPU; its record is sealed with this frame's view.

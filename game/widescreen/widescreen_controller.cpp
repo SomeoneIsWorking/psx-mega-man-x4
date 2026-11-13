@@ -109,6 +109,55 @@ void WidescreenController::stepView(Core &core) {
   view_ = view_bounds::nextView(core, view_, plan_.widescreen() ? plan_.presentationHorizontalMargin : 0);
 }
 
+namespace {
+
+void writeMargins(psx::platform::BlobWriter &out, const psx::present::HorizontalMargins &margins) {
+  out.i32(margins.left);
+  out.i32(margins.right);
+}
+
+psx::present::HorizontalMargins readMargins(psx::platform::BlobReader &in) {
+  const int left = in.i32();
+  const int right = in.i32();
+  return {left, right};
+}
+
+void writeBeyond(psx::platform::BlobWriter &out, const psx::present::PictureBeyondBuffer &beyond) {
+  writeMargins(out, beyond.view);
+  writeMargins(out, beyond.picture);
+}
+
+psx::present::PictureBeyondBuffer readBeyond(psx::platform::BlobReader &in) {
+  const psx::present::HorizontalMargins view = readMargins(in);
+  return {.view = view, .picture = readMargins(in)};
+}
+
+} // namespace
+
+void WidescreenController::saveView(psx::platform::BlobWriter &out) const {
+  out.i32(view_.offset);
+  writeBeyond(out, view_.beyond);
+  out.i32(view_.cameraX);
+  out.boolean(view_.inStage);
+  writeBeyond(out, submitted_);
+}
+
+bool WidescreenController::loadView(psx::platform::BlobReader &in, std::string &error) {
+  view_bounds::View view;
+  view.offset = in.i32();
+  view.beyond = readBeyond(in);
+  view.cameraX = in.i32();
+  view.inStage = in.boolean();
+  const psx::present::PictureBeyondBuffer submitted = readBeyond(in);
+  if (!in.ok()) {
+    error = "x4 view: the stream ends early";
+    return false;
+  }
+  view_ = view;
+  submitted_ = submitted;
+  return true;
+}
+
 camera_layers::LayerShifts WidescreenController::layerShifts(Core &core) const {
   return camera_layers::layerShifts(core, view_.offset);
 }
