@@ -56,6 +56,7 @@ struct PlayerOffsets {
   static constexpr uint32_t kYPosHi = 0x0E;       // s16 integer part of y
   static constexpr uint32_t kBgSlot = 0x14;       // s8 background layer index; <0 means screen-space
   static constexpr uint32_t kAnimTable = 0x30;    // pointer to the per-character animation table
+  static constexpr uint32_t kFrameTable = 0x3C;   // frame table: per frame u16 piece count, u16 first piece
   static constexpr uint32_t kCurAnim = 0x47;      // u8 frame-table index consumed by the sprite pass
   static constexpr uint32_t kPrevAnim = 0x48;     // u8
   static constexpr uint32_t kHitpoints = 0x5C;    // s8 life-gauge source (gauge renderer 0x800253F0)
