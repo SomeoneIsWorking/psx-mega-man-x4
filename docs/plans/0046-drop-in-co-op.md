@@ -113,8 +113,9 @@ checkpoint respawns and stage loads: the retail scripts steer player 1 alone and
 out of view for 60 fields is withdrawn and returns the same way. Its death runs the retail death state
 `0x80035A6C` for 120 fields with the engine block restored after each pass, so it cannot end the stage. A stage or
 section change loads that stage's counterpart palette again. Its gauge is the retail HUD pieces drawn with it
-projected, 104 px under player 1's (MegaManX4Recomp's layout), its tiles copied from the counterpart's UI texture
-into page 5 rows 64-175. The knob is a settings-menu row.
+projected, drawn 104 px under player 1's (MegaManX4Recomp's layout) with its tiles copied from the counterpart's UI
+texture into page 5 rows 64-175; the walk draws the changed words (psxport `HostPackets::replace`) and guest RAM keeps
+what the retail pieces wrote. The knob is a settings-menu row.
 
 ## Follow-ups (not done)
 

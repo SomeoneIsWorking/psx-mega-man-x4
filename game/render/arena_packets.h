@@ -6,6 +6,8 @@
 #include <array>
 #include <cstdint>
 #include <optional>
+#include <span>
+#include <vector>
 
 class Core;
 
@@ -30,6 +32,10 @@ Packet nextPacket(Core &core, Packet packet);
 std::optional<int> leftmostX(Core &core, Packet packet);
 // The walk of the table being built draws `packet` with every vertex `dx` columns right; guest RAM is untouched.
 void moveX(Core &core, Packet packet, int dx);
+// The GP0 words of `packet`, its tag excluded, as the guest wrote them.
+std::vector<std::uint32_t> words(Core &core, Packet packet);
+// The walk of the table being built draws `words` in place of `packet`'s; guest RAM is untouched.
+void replace(Core &core, Packet packet, std::span<const std::uint32_t> words);
 
 // The object draws (0x80024334, 0x8002588C, 0x80024920, 0x80024B9C) put each piece in a slot of this many bytes of
 // the first arena whatever its command's length (cursor `+0x28` per piece); its draw mode goes to the second.

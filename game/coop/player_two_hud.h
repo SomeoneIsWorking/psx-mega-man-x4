@@ -37,7 +37,8 @@ HudArenas hudArenas(Core &core);
 
 class PlayerTwoHud final {
 public:
-  // Moves the packets written since `before` under player 1's gauge and points their tiles at player 2's copies.
+  // The walk draws the packets written since `before` under player 1's gauge with their tiles on player 2's copies
+  // (arena::replace); guest RAM keeps what the retail pieces wrote.
   void place(Core &core, const Counterpart &counterpart, const HudArenas &before);
   // A stage load may reuse the tile area; the next draw uploads every tile again.
   void forget() {

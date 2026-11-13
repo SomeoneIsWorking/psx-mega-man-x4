@@ -73,9 +73,28 @@ std::optional<int> leftmostX(Core &core, Packet packet) {
   return leftmost;
 }
 
+namespace {
+
+std::uint32_t buildingRoot(Core &core) {
+  return draw_info::orderingTableRoot(core.mem_r32(draw_info::kCurrentDrawInfo));
+}
+
+} // namespace
+
 void moveX(Core &core, Packet packet, int dx) {
-  core.hostPackets.moveX(
-      core, draw_info::orderingTableRoot(core.mem_r32(draw_info::kCurrentDrawInfo)), packet.address, dx);
+  core.hostPackets.moveX(core, buildingRoot(core), packet.address, dx);
+}
+
+std::vector<std::uint32_t> words(Core &core, Packet packet) {
+  std::vector<std::uint32_t> words(core.mem_r8(packet.address + kTagLengthOffset));
+  for (std::size_t i = 0; i < words.size(); ++i) {
+    words[i] = core.mem_r32(packet.address + 4u + static_cast<std::uint32_t>(i) * 4u);
+  }
+  return words;
+}
+
+void replace(Core &core, Packet packet, std::span<const std::uint32_t> words) {
+  core.hostPackets.replace(core, buildingRoot(core), packet.address, words);
 }
 
 } // namespace x4::arena

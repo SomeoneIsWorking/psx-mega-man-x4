@@ -3,6 +3,7 @@
 #include "coop.h"
 #include "counterpart.h"
 
+#include "arena_packets.h"
 #include "core.h"
 #include "gpu_device.h"
 
@@ -20,6 +21,11 @@ constexpr std::uint32_t kSpriteBytes = 16u; // SPRT_16: tag, color, xy, uv + CLU
 constexpr std::uint32_t kModeBytes = 8u;    // tag, 0xE1 draw mode with the texture page
 constexpr std::uint32_t kBarBytes = 24u;    // POLY_F4: tag, color, four xy
 constexpr std::uint32_t kTpageMask = 0x1Fu;
+// GP0 words after the tag: SPRT_16 colour, xy, uv + CLUT; the draw mode's E1; POLY_F4 colour then four xy.
+constexpr std::size_t kSpriteXy = 1u;
+constexpr std::size_t kSpriteUvClut = 2u;
+constexpr std::size_t kModeWord = 0u;
+constexpr std::size_t kBarFirstCorner = 1u;
 constexpr std::int32_t kPageWidth = 64; // VRAM halfwords per 4-bit texture page
 constexpr std::int32_t kPageHeight = 256;
 constexpr std::int32_t kTileTexels = 16;
@@ -29,6 +35,12 @@ constexpr std::uint32_t kSlotPage = 5u;
 constexpr std::int32_t kSlotTop = 64;
 constexpr std::size_t kSlotsAcross = 16u;
 constexpr std::size_t kSlotCount = kSlotsAcross * 7u;
+
+// An xy word kGaugeDrop rows lower.
+std::uint32_t dropped(std::uint32_t xy) {
+  const auto y = static_cast<std::uint16_t>((xy >> 16) + static_cast<std::uint32_t>(kGaugeDrop));
+  return (xy & 0xFFFFu) | (static_cast<std::uint32_t>(y) << 16);
+}
 
 } // namespace
 
@@ -71,27 +83,39 @@ void PlayerTwoHud::place(Core &core, const Counterpart &counterpart, const HudAr
     lucent::error("x4-coop", "player 2's HUD sprites and draw modes differ in count");
     std::abort();
   }
-  std::uint32_t mode = before.modes;
-  for (std::uint32_t sprite = before.sprites; sprite < after.sprites; sprite += kSpriteBytes, mode += kModeBytes) {
-    core.mem_w16(sprite + 10u, static_cast<std::uint16_t>(core.mem_r16(sprite + 10u) + kGaugeDrop));
-    core.mem_w16(sprite + 14u, playerTwoClut(core.mem_r16(sprite + 14u)));
-    const std::uint32_t drawMode = core.mem_r32(mode + 4u);
-    const std::uint32_t page = drawMode & kTpageMask;
+  std::uint32_t modeAddress = before.modes;
+  for (std::uint32_t spriteAddress = before.sprites; spriteAddress < after.sprites;
+       spriteAddress += kSpriteBytes, modeAddress += kModeBytes) {
+    const arena::Packet sprite{spriteAddress};
+    std::vector<std::uint32_t> spriteWords = arena::words(core, sprite);
+    spriteWords[kSpriteXy] = dropped(spriteWords[kSpriteXy]);
+    const std::uint32_t uv = spriteWords[kSpriteUvClut] & 0xFFFFu;
+    const auto clut = static_cast<std::uint16_t>(spriteWords[kSpriteUvClut] >> 16);
+    spriteWords[kSpriteUvClut] = uv | (static_cast<std::uint32_t>(playerTwoClut(clut)) << 16);
+    const arena::Packet mode{modeAddress};
+    std::vector<std::uint32_t> modeWords = arena::words(core, mode);
+    const std::uint32_t page = modeWords[kModeWord] & kTpageMask;
     const Tile tile{.x = static_cast<std::int32_t>(page & 0xFu) * kPageWidth +
-                         core.mem_r8(sprite + 12u) / (kTileTexels / kTileWidth),
-                    .y = static_cast<std::int32_t>(page >> 4) * kPageHeight + core.mem_r8(sprite + 13u)};
-    if (!counterpart.uiPixel(tile.x, tile.y)) {
-      continue;
+                         static_cast<std::int32_t>(uv & 0xFFu) / (kTileTexels / kTileWidth),
+                    .y = static_cast<std::int32_t>(page >> 4) * kPageHeight + static_cast<std::int32_t>(uv >> 8)};
+    if (counterpart.uiPixel(tile.x, tile.y)) {
+      const std::size_t index = slot(core, counterpart, tile);
+      const auto u = static_cast<std::uint32_t>((index % kSlotsAcross) * kTileTexels);
+      const auto v =
+          static_cast<std::uint32_t>(kSlotTop + static_cast<std::int32_t>(index / kSlotsAcross) * kTileTexels);
+      spriteWords[kSpriteUvClut] = (spriteWords[kSpriteUvClut] & 0xFFFF0000u) | (v << 8) | u;
+      modeWords[kModeWord] = (modeWords[kModeWord] & ~kTpageMask) | kSlotPage;
+      arena::replace(core, mode, modeWords);
     }
-    const std::size_t index = slot(core, counterpart, tile);
-    core.mem_w8(sprite + 12u, static_cast<std::uint8_t>((index % kSlotsAcross) * kTileTexels));
-    core.mem_w8(sprite + 13u, static_cast<std::uint8_t>(kSlotTop + (index / kSlotsAcross) * kTileTexels));
-    core.mem_w32(mode + 4u, (drawMode & ~kTpageMask) | kSlotPage);
+    arena::replace(core, sprite, spriteWords);
   }
-  for (std::uint32_t bar = before.bars; bar < after.bars; bar += kBarBytes) {
-    for (std::uint32_t corner = 10u; corner < kBarBytes; corner += 4u) {
-      core.mem_w16(bar + corner, static_cast<std::uint16_t>(core.mem_r16(bar + corner) + kGaugeDrop));
+  for (std::uint32_t barAddress = before.bars; barAddress < after.bars; barAddress += kBarBytes) {
+    const arena::Packet bar{barAddress};
+    std::vector<std::uint32_t> barWords = arena::words(core, bar);
+    for (std::size_t corner = kBarFirstCorner; corner < barWords.size(); ++corner) {
+      barWords[corner] = dropped(barWords[corner]);
     }
+    arena::replace(core, bar, barWords);
   }
 }
 
