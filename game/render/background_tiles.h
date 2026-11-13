@@ -60,6 +60,8 @@ inline constexpr std::uint32_t kForegroundDepth = 0x4Bu;
 inline constexpr std::uint32_t kSpriteCode = 0x7D000000u;
 inline constexpr std::uint32_t kSpriteSemiTransparent = 0x02000000u;
 inline constexpr int kSpriteWords = 3;
+// An arena slot: the tag, then the sprite.
+inline constexpr std::uint32_t kSpriteBytes = 16u;
 
 // Tile cell bits: tile index, semi-transparent, foreground group.
 inline constexpr std::uint16_t kCellTileMask = 0x3FFFu;
@@ -109,7 +111,8 @@ public:
   WideBackground(psx::present::HorizontalMargins margins, const camera_layers::LayerShifts &shifts)
       : margins_(margins), shifts_(shifts) {}
 
-  // After the retail window of a layer linked its sprites: moves them by the layer's shift and builds the margin
+  // After the retail window of a layer linked its sprites: has the walk draw them moved by the layer's shift (guest
+  // RAM keeps retail's x) and builds the margin
   // columns its shifted window leaves into `batch`, from the block map (a looping layer wraps as FUN_80027344
   // does; past any other map there is no tile).
   void drawLayer(Core &core, const LayerPass &pass, MarginBatch &batch) const;

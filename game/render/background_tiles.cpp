@@ -153,8 +153,9 @@ void WideBackground::drawLayer(Core &core, const LayerPass &pass, MarginBatch &b
   const auto [layer, firstRetailSprite] = pass;
   const int shift = shifts_[static_cast<std::size_t>(layer)];
   if (shift != 0) {
-    for (std::uint32_t retail = firstRetailSprite; retail < core.mem_r32(kSpriteCursor); retail += 16u) {
-      core.mem_w16(retail + 8u, static_cast<std::uint16_t>(core.mem_r16s(retail + 8u) + shift));
+    const std::uint32_t root = draw_info::orderingTableRoot(core.mem_r32(draw_info::kCurrentDrawInfo));
+    for (std::uint32_t retail = firstRetailSprite; retail < core.mem_r32(kSpriteCursor); retail += kSpriteBytes) {
+      core.hostPackets.moveX(core, root, retail, shift);
     }
   }
   const LayerView view = readLayer(core, layer);

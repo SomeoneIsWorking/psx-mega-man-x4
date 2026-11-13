@@ -2,6 +2,7 @@
 #include "arena_packets.h"
 
 #include "core.h"
+#include "draw_info.h"
 
 #include <algorithm>
 
@@ -72,12 +73,9 @@ std::optional<int> leftmostX(Core &core, Packet packet) {
   return leftmost;
 }
 
-void shiftX(Core &core, Packet packet, int dx) {
-  const Vertices vertices = verticesOf(commandOf(core, packet));
-  for (std::uint32_t i = 0; i < vertices.count; ++i) {
-    const std::uint32_t address = vertexX(packet, vertices, i);
-    core.mem_w16(address, static_cast<std::uint16_t>(static_cast<std::int16_t>(core.mem_r16(address)) + dx));
-  }
+void moveX(Core &core, Packet packet, int dx) {
+  core.hostPackets.moveX(
+      core, draw_info::orderingTableRoot(core.mem_r32(draw_info::kCurrentDrawInfo)), packet.address, dx);
 }
 
 } // namespace x4::arena

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // arena_packets.h - the SLUS_005.61 scratchpad packet arenas the object draw pass (0x80023DB8) fills, and moving
-// the packets a pass wrote into them.
+// the packets a pass wrote into them when they are drawn.
 #pragma once
 
 #include <array>
@@ -28,8 +28,8 @@ Positions positions(Core &core);
 Packet nextPacket(Core &core, Packet packet);
 // The leftmost vertex x of a polygon or rectangle packet; none for any other command.
 std::optional<int> leftmostX(Core &core, Packet packet);
-// Moves every vertex of a polygon or rectangle packet `dx` columns; any other command is left alone.
-void shiftX(Core &core, Packet packet, int dx);
+// The walk of the table being built draws `packet` with every vertex `dx` columns right; guest RAM is untouched.
+void moveX(Core &core, Packet packet, int dx);
 
 // The object draws (0x80024334, 0x8002588C, 0x80024920, 0x80024B9C) put each piece in a slot of this many bytes of
 // the first arena whatever its command's length (cursor `+0x28` per piece); its draw mode goes to the second.

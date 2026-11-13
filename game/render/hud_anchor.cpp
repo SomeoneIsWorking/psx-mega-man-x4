@@ -14,7 +14,7 @@ void HudAnchor::anchor(Core &core, const arena::Positions &before) const {
   arena::forEachSince(core, before, [&](arena::Packet packet) {
     const std::optional<int> leftmost = arena::leftmostX(core, packet);
     if (leftmost) {
-      arena::shiftX(core, packet, *leftmost < kCentre ? -margins_.left : margins_.right);
+      arena::moveX(core, packet, *leftmost < kCentre ? -margins_.left : margins_.right);
     }
   });
 }
