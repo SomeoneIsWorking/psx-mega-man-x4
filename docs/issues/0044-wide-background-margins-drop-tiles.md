@@ -171,10 +171,37 @@ Still open:
   `warp 0/0/1` and `0/0/2` arrive at x 1360 and 3328 (room entries `0x800F3338`, `0x800F335C`), so both rooms are
   a walk past the arrival, which needs steering. The states predate the task section (issue 0046) and cannot load;
   a report filed in those rooms on this build loads.
-- At the `0/0/2` arrival the right margin shows a dark column between two wall pieces (`cp/a/sheet.png`), not yet
-  traced; that run was built against another agent's uncommitted psxport presentation edits.
-- Arena capacity (reports `-154132`, `-154209`): margin sprites need about 384 more slots than the 1,000 of
-  `D_8015D9D0` (cap at `0x80026BB0`, followed by the VRAM rect queue `0x801659D0`). Growing it into guest RAM needs a
-  span proven unused (no heap map yet: the libc heap is `0x80175F3C`+`0x820C8`). The other route is a record-path
-  seam that appends host-owned packets to an ordering-table bucket, which is psxport presentation, owned by the
-  Spyro agent at the moment, so it is reported rather than built here.
+
+Arena capacity fixed (2026-11-13, RE in `scratch/arena/d1`..`d9`): the margin no longer touches retail's arena,
+ring or chains. `WideBackground::drawLayer` builds each margin tile's SPRT_16 words (code `0x7D`, bit 1 for
+semi-transparency, as every one of the 2,048 arena slots holds in report `-154132`'s state) from the block map
+into a `MarginBatch` by side and texture-page bucket. After the layer's splice `0x80026894` (which puts each
+non-empty group's texture-page node `0x80171EB0` in front of its sprites and links the group in front of its
+ordering-table slot, `drawInfo + 0x70 + depth * 4`, depth at camera layer `+0x4A`/`+0x4B`), `spliceMargins`
+inserts them as psxport `HostPackets` into the walk from `drawInfo + 0x9C`: a group retail drew goes before its
+tail's next node (checked to be the slot's previous next), and a group retail left empty goes, with a copy of its
+texture-page node, before the node the splice would have put it in front of. The frame driver discards the table
+it clears. The ring refill override and the 1,000-sprite budget are gone.
+
+Found on the way: at the `0/0/2` arrival the walk skipped slots 5..3 (chain `S6 -> 0x8016BD98 -> 0x801539C8 -> S2`).
+A widened-only object (`0x80173D00`, id `0x12`, raised by `cull::objectDrawPass`) reached the sprite builder
+`0x80024334` with a frame of 0 pieces; with none, the builder still links its group tail to the unwritten draw-mode
+node at `0x1F800104` and makes the packet before the cursor the tail, so the next quad draw reused that node in a
+second group and `0x80024260` spliced it into two slots. `layer_objects` now draws nothing for a frame of no
+pieces. The dark right-margin column at that arrival is the room's own door gap: the 4:3 run shows it at the same
+place (`scratch/arena/a0_sheet.png`, `a3_sheet.png`).
+
+Proof (`scratch/arena`, report `-154132`'s pad, `warp 0/0/2`, judgement settings):
+- Frames 2760-3000 every 60 (`w3_sheet.png`): no black block in either margin. `PSXPORT_DEBUG=x4-bg` logs every
+  layer's margin (up to 96 sprites, retail up to 529) and groups retail left empty filled (`2 in 1 group`), and no
+  walk ended with an undrawn host packet (a fault otherwise).
+- Guest RAM: a state at frame 3000 (`w3/A.bin`) loaded at 16:9 and at 4:3, RAM snapshotted each of the next 30
+  frames and paired by the retail field counter `0x80141BD8` (`ramproof.py`): no differing byte in the arena past
+  the retail count or in any field but x, the ring, the tails, the heads or the texture-page nodes. What differs is
+  the x of retail sprites the layer shift moves (16,284 bytes), the placement table at `0x800F4AD0` (60) and two
+  object records at `0x80142FC0` (150), both from the widened activity window.
+- The same psxport build draws Tomba 2's margins at `warp 13/0` (`scratch/arena/t2/t2_a.png`) and Spyro 1's
+  widened intro scene (`scratch/arena/s1/s1_0.png`).
+
+Still open:
+- The first frame after a state load draws no margin: the pending host packets are not in the machine state.

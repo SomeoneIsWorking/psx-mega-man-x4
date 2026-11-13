@@ -7,7 +7,7 @@ class Core;
 
 namespace x4::background {
 
-// Wraps the layer draw and the ring refill: the retail body runs first, the wide margin is added after it.
+// Wraps the layer draw and its splice: each retail body runs first, the wide margin follows it.
 void registerOverrides(Core &core);
 
 } // namespace x4::background

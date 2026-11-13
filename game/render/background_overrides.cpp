@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// The retail bodies run unchanged through the scoped original call; the margin is added after they return.
+// The retail bodies run unchanged through the scoped original call; the margin is built after the draw and
+// inserted after the splice.
 #include "background_overrides.h"
 
 #include "background_tiles.h"
@@ -28,19 +29,22 @@ void drawLayer(Core *core) {
   const int layer = static_cast<int>(core->r[kArg0]);
   const std::uint32_t firstRetailSprite = core->mem_r32(kSpriteCursor);
   original(core, kDrawLayer, "background::drawLayer original");
-  wideBackground(*core).drawLayer(*core, {.layer = layer, .firstRetailSprite = firstRetailSprite});
+  wideBackground(*core).drawLayer(
+      *core, {.layer = layer, .firstRetailSprite = firstRetailSprite}, session(*core).marginBatch);
 }
 
-void refillRing(Core *core) {
-  original(core, kRefillRing, "background::refillRing original");
-  wideBackground(*core).refillRing(*core);
+void spliceLayer(Core *core) {
+  const int layer = static_cast<int>(core->r[kArg0]);
+  const SpliceSlots before = spliceSlots(*core, layer);
+  original(core, kSpliceLayer, "background::spliceLayer original");
+  spliceMargins(*core, layer, before, session(*core).marginBatch);
 }
 
 } // namespace
 
 void registerOverrides(Core &core) {
   psx::cpu::installNativeOverride(core, kDrawLayer, "background::drawLayer", drawLayer);
-  psx::cpu::installNativeOverride(core, kRefillRing, "background::refillRing", refillRing);
+  psx::cpu::installNativeOverride(core, kSpliceLayer, "background::spliceLayer", spliceLayer);
 }
 
 } // namespace x4::background

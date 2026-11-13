@@ -4,9 +4,13 @@
 
 #include "camera_layers.h"
 #include "core.h"
+#include "draw_info.h"
+#include "ordering_table.h"
 #include "player_object.h"
 
 #include <algorithm>
+#include <cstdlib>
+#include <lucent/log.h>
 
 namespace x4::background {
 namespace {
@@ -17,7 +21,6 @@ using guest::CameraLayerOffsets;
 constexpr int kTile = RetailWindow::kTile;
 constexpr int kTileShift = 4;
 constexpr int kTileMask = kTile - 1;
-constexpr int kRingMask = RetailWindow::kRing - 1;
 
 constexpr int ceilTiles(int pixels) {
   return pixels > 0 ? (pixels + kTileMask) >> kTileShift : 0;
@@ -25,12 +28,6 @@ constexpr int ceilTiles(int pixels) {
 
 std::uint32_t layerAddress(int layer) {
   return guest::kCameraLayersAddress + static_cast<std::uint32_t>(layer) * guest::kCameraLayerStride;
-}
-
-std::uint32_t ringCell(int layer, int row, int column) {
-  return kRingBase + static_cast<std::uint32_t>(layer) * kRingLayerStride +
-         static_cast<std::uint32_t>(row & kRingMask) * kRingRowStride +
-         static_cast<std::uint32_t>(column & kRingMask) * 2u;
 }
 
 // A layer's view onto its map, in tiles.
@@ -71,45 +68,71 @@ std::uint16_t mapTile(Core &core, int layer, int column, int row) {
                       static_cast<std::uint32_t>(column & kTileMask) * 2u);
 }
 
-// A SPRT_16 of the arena (@ 0x80026BC0..0x80026C84), then appended to its bucket's chain.
 // A sprite's top-left on screen.
 struct ScreenPoint {
   int x;
   int y;
 };
 
-void linkSprite(Core &core, std::uint32_t sprite, std::uint16_t cell, int layer, const ScreenPoint &at) {
-  const std::uint32_t attribute = core.mem_r32(core.mem_r32(kTileAttributes) + (cell & kCellTileMask) * 4u);
-  core.mem_w16(sprite + 14u,
-               static_cast<std::uint16_t>((((attribute & 0xF000u) >> 6) + 0x7900u) | ((attribute & 0xF00u) >> 8)));
-  const std::uint8_t code = core.mem_r8(sprite + 7u);
-  core.mem_w8(sprite + 7u, (cell & kCellSemiTransparent) != 0 ? (code | 2u) : (code & ~2u));
-  core.mem_w8(sprite + 12u, static_cast<std::uint8_t>((attribute >> 12) & 0xF0u));
-  core.mem_w8(sprite + 13u, static_cast<std::uint8_t>((attribute >> 16) & 0xF0u));
-  core.mem_w16(sprite + 8u, static_cast<std::uint16_t>(at.x));
-  core.mem_w16(sprite + 10u, static_cast<std::uint16_t>(at.y));
+// The words AA0 writes into an arena SPRT_16 for `cell` (@ 0x80026BC0..0x80026C84), and its group and bucket.
+struct MarginSprite {
+  std::array<std::uint32_t, kSpriteWords> words;
+  int side;
+  int bucket;
+};
 
-  const std::uint32_t group =
-      static_cast<std::uint32_t>(layer) + ((cell & kCellForeground) != 0 ? kForegroundGroupOffset : 0u);
-  const std::uint32_t bucket = kBucketBase + core.mem_r32(kFrameIndex) * kBucketFrameStride +
-                               group * kBucketGroupStride + (attribute >> 24) * 4u;
-  const std::uint32_t tail = core.mem_r32(bucket);
-  core.mem_w32(tail, (core.mem_r32(tail) & 0xFF000000u) | (sprite & 0x00FFFFFFu));
-  core.mem_w32(bucket, sprite);
+MarginSprite marginSprite(Core &core, std::uint16_t cell, const ScreenPoint &at) {
+  const std::uint32_t attribute = core.mem_r32(core.mem_r32(kTileAttributes) + (cell & kCellTileMask) * 4u);
+  const std::uint32_t clut = (((attribute & 0xF000u) >> 6) + 0x7900u) | ((attribute & 0xF00u) >> 8);
+  const std::uint32_t u = (attribute >> 12) & 0xF0u;
+  const std::uint32_t v = (attribute >> 16) & 0xF0u;
+  return {.words = {kSpriteCode | ((cell & kCellSemiTransparent) != 0 ? kSpriteSemiTransparent : 0u),
+                    (static_cast<std::uint32_t>(at.y & 0xFFFF) << 16) | static_cast<std::uint32_t>(at.x & 0xFFFF),
+                    (clut << 16) | (v << 8) | u},
+          .side = (cell & kCellForeground) != 0 ? 1 : 0,
+          .bucket = static_cast<int>(attribute >> 24)};
 }
 
-// Sprites the later layers may still need for their own retail windows.
-int reservedSprites(Core &core, int layer) {
-  int reserved = 0;
-  for (int later = layer + 1; later < guest::kCameraLayerCount; ++later) {
-    if (core.mem_r8(layerAddress(later) + CameraLayerOffsets::kEnabled) != 0) {
-      reserved += RetailWindow::kColumns * RetailWindow::kRows;
-    }
-  }
-  return reserved;
+std::uint32_t groupOf(int layer, int side) {
+  return static_cast<std::uint32_t>(layer) + (side != 0 ? kForegroundGroupOffset : 0u);
+}
+
+std::uint32_t bucketWord(Core &core, std::uint32_t table, int layer, int side, int bucket) {
+  return table + core.mem_r32(kFrameIndex) * kBucketFrameStride + groupOf(layer, side) * kBucketGroupStride +
+         static_cast<std::uint32_t>(bucket) * 4u;
+}
+
+std::uint32_t modeNode(Core &core, int layer, int side, int bucket) {
+  return kModeNodes + core.mem_r32(kFrameIndex) * kModeFrameStride + groupOf(layer, side) * kModeGroupStride +
+         static_cast<std::uint32_t>(bucket) * kModeBucketStride;
+}
+
+std::uint32_t nextNode(Core &core, std::uint32_t node) {
+  return psx::gpu::guestAddressOf(core.mem_r32(node) & psx::gpu::kOtNextAddressMask);
 }
 
 } // namespace
+
+MarginBatch::MarginBatch() {
+  for (std::vector<std::uint32_t> &words : words_) {
+    words.reserve(static_cast<std::size_t>(RetailWindow::kRows) * RetailWindow::kColumns * kSpriteWords);
+  }
+}
+
+void MarginBatch::begin(int layer) {
+  if (layer_ >= 0) {
+    lucent::error("x4-bg", "layer {} drew its margin while layer {}'s was never spliced", layer, layer_);
+    std::abort();
+  }
+  layer_ = layer;
+}
+
+void MarginBatch::end() {
+  layer_ = -1;
+  for (std::vector<std::uint32_t> &words : words_) {
+    words.clear();
+  }
+}
 
 MarginColumns marginColumns(int scrollX, psx::present::HorizontalMargins margins) {
   if (margins.total() <= 0 || scrollX < 0) {
@@ -118,9 +141,7 @@ MarginColumns marginColumns(int scrollX, psx::present::HorizontalMargins margins
   const int fraction = scrollX & kTileMask;
   // Retail's first sprite starts at -fraction and the 21st ends at 336 - fraction.
   const int retailEnd = RetailWindow::kColumns * kTile - fraction;
-  const int left = std::min(ceilTiles(margins.left - fraction), RetailWindow::kSpareColumns);
-  const int right = ceilTiles(320 + margins.right - retailEnd);
-  return {left, std::min(right, RetailWindow::kSpareColumns - left)};
+  return {ceilTiles(margins.left - fraction), ceilTiles(320 + margins.right - retailEnd)};
 }
 
 psx::present::HorizontalMargins WideBackground::layerMargins(int layer) const {
@@ -128,37 +149,11 @@ psx::present::HorizontalMargins WideBackground::layerMargins(int layer) const {
   return {margins_.left + shift, margins_.right - shift};
 }
 
-void WideBackground::refillRing(Core &core) const {
-  for (int layer = 0; layer < guest::kCameraLayerCount; ++layer) {
-    const LayerView view = readLayer(core, layer);
-    const MarginColumns columns = marginColumns(view.scrollX, layerMargins(layer));
-    const camera_layers::LoopBlocks loop(core, layer);
-    if (columns.total() == 0 || view.scrollY < 0) {
-      continue;
-    }
-    const int first = view.firstColumn();
-    const int top = view.firstRow();
-    for (int row = top; row < top + RetailWindow::kRows; ++row) {
-      for (int offset = -columns.left; offset < columns.right + RetailWindow::kColumns; ++offset) {
-        if (offset >= 0 && offset < RetailWindow::kColumns) {
-          continue;
-        }
-        const int column = first + offset;
-        const int mapColumn = loop.wrap(column);
-        const std::uint16_t cell =
-            view.contains(mapColumn, row) ? mapTile(core, layer, mapColumn, row) : std::uint16_t{0};
-        core.mem_w16(ringCell(layer, row, column), cell);
-      }
-    }
-  }
-}
-
-void WideBackground::drawLayer(Core &core, const LayerPass &pass) const {
+void WideBackground::drawLayer(Core &core, const LayerPass &pass, MarginBatch &batch) const {
   const auto [layer, firstRetailSprite] = pass;
   const int shift = shifts_[static_cast<std::size_t>(layer)];
-  std::uint32_t sprite = core.mem_r32(kSpriteCursor);
   if (shift != 0) {
-    for (std::uint32_t retail = firstRetailSprite; retail < sprite; retail += 16u) {
+    for (std::uint32_t retail = firstRetailSprite; retail < core.mem_r32(kSpriteCursor); retail += 16u) {
       core.mem_w16(retail + 8u, static_cast<std::uint16_t>(core.mem_r16s(retail + 8u) + shift));
     }
   }
@@ -167,8 +162,8 @@ void WideBackground::drawLayer(Core &core, const LayerPass &pass) const {
   if (columns.total() == 0 || view.scrollY < 0) {
     return;
   }
-  const std::uint32_t limit = RetailWindow::kSpriteCap - static_cast<std::uint32_t>(reservedSprites(core, layer));
-  std::uint32_t count = core.mem_r32(kSpriteCount);
+  batch.begin(layer);
+  const camera_layers::LoopBlocks loop(core, layer);
   const int first = view.firstColumn();
   const int top = view.firstRow();
   const int originX = shift - (view.scrollX & kTileMask);
@@ -178,22 +173,118 @@ void WideBackground::drawLayer(Core &core, const LayerPass &pass) const {
       if (offset >= 0 && offset < RetailWindow::kColumns) {
         continue;
       }
-      const std::uint16_t cell = core.mem_r16(ringCell(layer, top + row, first + offset));
+      const int mapColumn = loop.wrap(first + offset);
+      if (!view.contains(mapColumn, top + row)) {
+        continue;
+      }
+      const std::uint16_t cell = mapTile(core, layer, mapColumn, top + row);
       if (cell == 0) {
         continue;
       }
-      if (count >= limit) {
-        core.mem_w32(kSpriteCursor, sprite);
-        core.mem_w32(kSpriteCount, count);
-        return;
-      }
-      ++count;
-      linkSprite(core, sprite, cell, layer, {originX + offset * kTile, originY + row * kTile});
-      sprite += 16u;
+      const MarginSprite sprite = marginSprite(core, cell, {originX + offset * kTile, originY + row * kTile});
+      std::vector<std::uint32_t> &words = batch.words(sprite.side, sprite.bucket);
+      words.insert(words.end(), sprite.words.begin(), sprite.words.end());
     }
   }
-  core.mem_w32(kSpriteCursor, sprite);
-  core.mem_w32(kSpriteCount, count);
+}
+
+SpliceSlots spliceSlots(Core &core, int layer) {
+  const std::uint32_t drawInfo = core.mem_r32(draw_info::kCurrentDrawInfo);
+  SpliceSlots slots{};
+  for (int side = 0; side < MarginBatch::kSides; ++side) {
+    const std::int32_t depth = core.mem_r8s(layerAddress(layer) + (side != 0 ? kForegroundDepth : kBackgroundDepth));
+    slots.slot[static_cast<std::size_t>(side)] =
+        draw_info::orderingTableSlot(drawInfo, static_cast<std::uint32_t>(depth));
+    slots.next[static_cast<std::size_t>(side)] = nextNode(core, slots.slot[static_cast<std::size_t>(side)]);
+  }
+  return slots;
+}
+
+void spliceMargins(Core &core, int layer, const SpliceSlots &before, MarginBatch &batch) {
+  if (batch.layer() != layer) {
+    return;
+  }
+  const std::uint32_t root = draw_info::orderingTableRoot(core.mem_r32(draw_info::kCurrentDrawInfo));
+  // Per slot, in splice order: the node a group spliced now would precede, and the groups retail left empty that
+  // the margin fills, latest first, all before that node.
+  struct SlotRun {
+    std::uint32_t slot;
+    std::uint32_t successor;
+    std::vector<std::vector<std::uint32_t>> emptyGroups;
+  };
+  std::array<SlotRun, MarginBatch::kSides> runs{};
+  for (int side = 0; side < MarginBatch::kSides; ++side) {
+    runs[static_cast<std::size_t>(side)] = {
+        before.slot[static_cast<std::size_t>(side)], before.next[static_cast<std::size_t>(side)], {}};
+  }
+  const auto runOf = [&runs](int side) -> SlotRun & {
+    // Both sides may share one slot; the run is the slot's.
+    return runs[side != 0 && runs[1].slot == runs[0].slot ? 0u : static_cast<std::size_t>(side)];
+  };
+  const auto flush = [&core, root](SlotRun &run) {
+    for (auto group = run.emptyGroups.rbegin(); group != run.emptyGroups.rend(); ++group) {
+      core.hostPackets.insertBefore(core, root, run.successor, *group);
+    }
+    run.emptyGroups.clear();
+  };
+  struct Inserted {
+    std::size_t total = 0;
+    std::size_t emptyGroupSprites = 0;
+    std::size_t emptyGroups = 0;
+  } inserted;
+  for (int bucket = 0; bucket < kBuckets; ++bucket) {
+    for (int side = 0; side < MarginBatch::kSides; ++side) {
+      SlotRun &run = runOf(side);
+      const std::vector<std::uint32_t> &words = batch.words(side, bucket);
+      inserted.total += words.size();
+      const std::uint32_t node = modeNode(core, layer, side, bucket);
+      if (core.mem_r32(bucketWord(core, kGroupHeads, layer, side, bucket)) != 0) {
+        // Retail spliced this group in front of the slot; the margin follows its last sprite.
+        const std::uint32_t tail = core.mem_r32(bucketWord(core, kBucketBase, layer, side, bucket));
+        if (nextNode(core, tail) != run.successor) {
+          lucent::error("x4-bg",
+                        "layer {} group {} bucket {}: the splice linked its tail 0x{:08X} to 0x{:08X}, not to 0x{:08X}",
+                        layer,
+                        groupOf(layer, side),
+                        bucket,
+                        tail,
+                        nextNode(core, tail),
+                        run.successor);
+          std::abort();
+        }
+        if (!words.empty()) {
+          core.hostPackets.insertBefore(core, root, nextNode(core, tail), words);
+        }
+        flush(run);
+        run.successor = node;
+        continue;
+      }
+      if (words.empty()) {
+        continue;
+      }
+      inserted.emptyGroupSprites += words.size() / kSpriteWords;
+      ++inserted.emptyGroups;
+      const std::uint32_t header = core.mem_r32(node);
+      std::vector<std::uint32_t> group;
+      group.reserve((header >> 24) + words.size());
+      for (std::uint32_t i = 0; i < (header >> 24); ++i) {
+        group.push_back(core.mem_r32(node + 4u + i * 4u));
+      }
+      group.insert(group.end(), words.begin(), words.end());
+      run.emptyGroups.push_back(std::move(group));
+    }
+  }
+  for (SlotRun &run : runs) {
+    flush(run);
+  }
+  lucent::debug("x4-bg",
+                "layer {} margin: {} sprites, {} in {} group(s) retail left empty; retail linked {} of its 1000",
+                layer,
+                inserted.total / kSpriteWords,
+                inserted.emptyGroupSprites,
+                inserted.emptyGroups,
+                core.mem_r32(kSpriteCount));
+  batch.end();
 }
 
 } // namespace x4::background

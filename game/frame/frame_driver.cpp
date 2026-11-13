@@ -5,10 +5,19 @@
 #include "game.h"
 #include "guest_execution.h"
 
+#include "draw_info.h"
 #include "music_stream.h"
 
 namespace x4::frame {
 namespace {
+
+using draw_info::kCurrentDrawInfo;
+using draw_info::kDrawEnvOffset;
+using draw_info::kDrawInfos;
+using draw_info::kDrawInfoStride;
+using draw_info::kOrderingTableClearOffset;
+using draw_info::kOrderingTableSlots;
+using draw_info::orderingTableRoot;
 
 // Guest entry points of retail gameMain 0x80012024.
 constexpr std::uint32_t kStartup = 0x800DAE84u;
@@ -29,13 +38,7 @@ constexpr std::uint32_t kLoadPalette = 0x80016004u;
 constexpr std::uint32_t kFinishFrame = 0x80012454u;
 
 constexpr std::uint32_t kScratchDrawInfoPosition = 0x1F800000u;
-constexpr std::uint32_t kCurrentDrawInfo = 0x80142F80u;
-constexpr std::uint32_t kDrawInfos = 0x80166C10u;
 constexpr std::uint32_t kFieldCounter = 0x80141BD8u;
-constexpr std::uint32_t kDrawInfoStride = 160u;
-constexpr std::uint32_t kDrawEnvOffset = 20u;
-constexpr std::uint32_t kOrderingTableClearOffset = 112u;
-constexpr std::uint32_t kOrderingTableDrawOffset = 156u;
 
 bool runRetailFramePrefix(Core &core,
                           guest::Dispatch dispatch,
@@ -55,7 +58,7 @@ bool runRetailFramePrefix(Core &core,
     guest::call(core, dispatch, {kPutDrawEnv, 0x80012070u, 4u});
 
     drawInfo = core.mem_r32(kCurrentDrawInfo);
-    core.r[4] = drawInfo + kOrderingTableDrawOffset;
+    core.r[4] = orderingTableRoot(drawInfo);
     guest::call(core, dispatch, {kDrawOTag, 0x80012080u, 4u});
     submitFrame(core);
 
@@ -64,8 +67,9 @@ bool runRetailFramePrefix(Core &core,
     core.mem_w32(kScratchDrawInfoPosition, drawInfoPosition);
     core.mem_w32(kCurrentDrawInfo, drawInfo);
     core.r[4] = drawInfo + kOrderingTableClearOffset;
-    core.r[5] = 12u;
+    core.r[5] = kOrderingTableSlots;
     guest::call(core, dispatch, {kClearOTagR, 0x800120B8u, 14u});
+    core.hostPackets.discard(orderingTableRoot(drawInfo));
 
     guest::call(core, dispatch, {kBeforeObjectsA, 0x800120C0u, 2u});
     core.r[31] = 0x800120C8u;

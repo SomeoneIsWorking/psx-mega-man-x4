@@ -1,6 +1,7 @@
 // Mega Man X4's per-Core state, created with each Game.
 #pragma once
 
+#include "background_tiles.h"
 #include "bios_threads.h"
 #include "coop.h"
 #include "fast_wait.h"
@@ -35,6 +36,7 @@ public:
   movie_cleanup::State movieCleanup;
   music_stream::State musicStream;
   WidescreenController widescreen;
+  background::MarginBatch marginBatch;
   cull::WidenedObjects widenedObjects;
   sequence_skip::SequenceSkip sequenceSkip;
   StageWarp stageWarp;

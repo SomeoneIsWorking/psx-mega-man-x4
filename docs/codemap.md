@@ -39,8 +39,9 @@ Frame loop: owned. `x4::frame::FrameDriver` runs one iteration of gameMain `0x80
 | `camera_layers` | `game/widescreen/camera_layers.*` | Layer 1/2 scroll rules from the mode tables `0x800F3140`/`0x800F3164` (`layerShift`), loop blocks `+0x4D..+0x4E` and `FUN_80027344`'s wrap |
 | `VisibilityCull`, `WidenedObjects` | `game/render/visibility_cull.*`, `widened_objects.*`, `cull_overrides.*` | Retail cull box and the margin objects lent `on_screen` for the draw pass only; the widened box (`presentedCull`) takes the drawn columns and each layer's shift |
 | `arena` | `game/render/arena_packets.*` | The draw pass's scratchpad packet arenas: cursors, the packets written since a point, vertex x of a polygon or rectangle |
-| `layer_objects` | `game/render/layer_objects.*` | The four layer-relative object draws (`0x80024334`, `0x8002588C`, `0x80024920`, `0x80024B9C`): their packets move by the shift of the layer the object's background byte names |
-| `WideBackground` | `game/render/background_tiles.*`, `background_overrides.*` | Each layer's retail sprites moved by its view shift and the margin tile columns from the layer cell ring |
+| `layer_objects` | `game/render/layer_objects.*` | The four layer-relative object draws (`0x80024334`, `0x8002588C`, `0x80024920`, `0x80024B9C`): their packets move by the shift of the layer the object's background byte names; a sprite frame of no pieces draws nothing |
+| `WideBackground`, `MarginBatch`, `spliceMargins` | `game/render/background_tiles.*`, `background_overrides.*` | Each layer's retail sprites moved by its view shift; the margin tile columns built from the block map after the layer draw (`0x80026AA0`) and inserted as `HostPackets` after its splice (`0x80026894`), where retail would have linked them |
+| `draw_info` | `game/frame/draw_info.h` | The two retail DRAWINFO buffers: ordering-table slots and the DrawOTag root |
 | `HudAnchor` | `game/render/hud_anchor.*`, `hud_overrides.*` | The HUD pass: the retail HUD, player 2's gauge, then every packet moved to its screen edge |
 | `vram_rect` | `game/render/vram_rect_queue.*` | The eight-entry VRAM rectangle upload queue; `decompress` for an owner that uploads a player graphic itself |
 | `title_quad` | `game/ui/title_quad.*` | The white quad behind the MEGAMAN logo |
