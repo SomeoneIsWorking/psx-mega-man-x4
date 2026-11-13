@@ -6,7 +6,7 @@ symptom: In gameplay at 16:9, rectangular blocks or whole strips of the left and
 tags: widescreen,background,render
 state_items: S006
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-11-13
 ---
 
 ## Reproduction
@@ -197,7 +197,7 @@ Proof (`scratch/arena`, report `-154132`'s pad, `warp 0/0/2`, judgement settings
   walk ended with an undrawn host packet (a fault otherwise).
 - Guest RAM: the layer shift of retail tiles, the layer shift of object pieces and the HUD anchor no longer write
   guest packets; each names the packet with `HostPackets::moveX` and the walk draws it moved. A state at frame 3000
-  (`w3/A.bin`) loaded at 16:9 and at 4:3, main RAM and scratchpad snapshotted each of the next 30 frames and
+  (`w5/A.bin`) loaded at 16:9 and at 4:3, main RAM and scratchpad snapshotted each of the next 30 frames and
   paired by the retail field counter `0x80141BD8` (`ramproof2.py`, `m3/`, `m0/`): 7 addresses differ, all the
   activity window. The placement table entries at `0x800F4AD0` and `0x800F4AD8` (spawned byte, placements at
   x `0x0E50`, y `0x01B0`) and the object at `0x80142FC0` hold 1 / live at 16:9; at 4:3 the lifetime check
@@ -213,8 +213,32 @@ Proof (`scratch/arena`, report `-154132`'s pad, `warp 0/0/2`, judgement settings
 - The same psxport build draws Tomba 2's margins at `warp 13/0` identically before and after the walk change (0
   differing pixels, `scratch/arena/t2/`) and Spyro 1's widened intro scene (`scratch/arena/s1b/cmp.png`).
 
+Load margins (2026-11-13, `scratch/loadfix`). Loading `w5/A.bin` at judgement settings, presents 2 and 3 (the first
+two after the load) had 969 black sink columns, x 2871-3839, the whole 108-column right side of the `{0, 108}` view
+(`before_p2.png`, `before_p3.png`); present 4 had none. Cause: `psxport render/record_rasterizer.cpp:RecordRasterizer::advance`
+resyncs from the device's VRAM after a load (the record spanning it is incomplete), and `seedCanvas` seeds only the
+buffer's columns, because the margins live only in the host canvases, which no machine state carried. X4 shows two
+buffers drawn before the save, so both presents showed empty margins; the third shows the first buffer a record
+drew after the load. The `native_width=256` line is the boot display before the load, not part of it. Fixed in
+psxport: the GPU section (layout 6) carries each margin canvas's windows and drawn columns at native pixels, and a
+load makes the canvases afresh from them (`RecordRasterizer::margins`, `restore`, `seedRestored`). Proof with a
+fresh state (`save/A.bin`, report `-154132`'s pad, `warp 0/0/2`, frame 3000; `w5/A.bin` is layout 4 and no longer
+loads): presents 2-5 after the load have no black column; present 2 is identical to the saving run's present at the
+save (mean difference 0.000, `save/at.png`) and present 4 to the one after its next step (0.000, `save/next1.png`)
+(`after_p2.png`, `after_p3.png`). Tomba 2 `warp 13/0` (`t2/at_s.png`) and Spyro 1 `warp 0/1/0` landed in Stone Hill
+(`s1/at_s.png`) draw both margins with no black column on the same build; a Spyro 1 state loaded there shows its
+margins from the first present (`s1l/`).
+
+Co-op gauge (2026-11-13): player 2's gauge changes rows, tiles, CLUT and texture page, which `moveX` cannot express,
+so psxport `HostPackets::replace(root, node, words)` has the walk draw given words in place of a node's packet, its
+moves applied on top. `PlayerTwoHud::place` builds each piece's words host-side (`arena::words`, `arena::replace`).
+Proof (`scratch/loadfix`, player 2 joined after `save/A.bin`, state `coop/C.bin`): the picture shows player 2's gauge
+under player 1's with Zero's icon and palette (`coop_hud.png`); guest RAM holds player 2's eight sprites at
+`0x801398B0..0x80139920` word for word equal to player 1's at `0x80139830..0x801398A0` (y 80, 71, 87, 39, 55; CLUT
+`0x7841`; page row 240), so no host edit is in guest RAM (`otp2/ram.bin`). `C.bin` loaded at 16:9 and 4:3, 40 frames
+each, 34 paired by `0x80141BD8` (`ram1/`, `ram0/`, `ramproof2.py`): 7 differing addresses, `0x800F4AD0..0x800F4AD8`,
+`0x80142FC8..0x80142FCC` and `0x80142FF8..0x80142FFC`, the activity window as above.
+
 Still open:
-- The first two records after a load draw no column past x 320 (the right margin is black), though the restored view
-  and submitted picture are right (`l12/run.log`); from the third record on it is drawn. The loading run announces
-  `native picture ... native_width=256` before the load and `320` on the first frame after it. Not traced yet.
-- Co-op player 2's gauge (`coop/player_two_hud.cpp`) still moves its packets by guest writes.
+- After a Tomba 2 state load at `warp 13/0` the run kept showing the SCEA card and `step` did not advance the frame
+  (`scratch/loadfix/t2l/`); not traced, and the loaded presents never reached the record path.
