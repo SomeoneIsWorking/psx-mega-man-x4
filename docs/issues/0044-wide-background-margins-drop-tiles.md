@@ -166,4 +166,15 @@ object's screen x (`presentedCull`). On report `-154132`'s pad the layer-2 objec
 columns, and the sky is identical, so the beams now hold their place on layer 2.
 
 Still open:
-- Report 5/10 part-0 checkpoint warp and the 1,000-sprite arena (reports 6, 8) not started.
+- Reports `-154058` and `-154304` are not reproduced. Their `state.bin` RAM (engine `0x801721C0`, camera
+  `0x801419BA`) puts them in stage 0 part 0 at checkpoint 1, camera x 2976, and checkpoint 2, camera x 4848.
+  `warp 0/0/1` and `0/0/2` arrive at x 1360 and 3328 (room entries `0x800F3338`, `0x800F335C`), so both rooms are
+  a walk past the arrival, which needs steering. The states predate the task section (issue 0046) and cannot load;
+  a report filed in those rooms on this build loads.
+- At the `0/0/2` arrival the right margin shows a dark column between two wall pieces (`cp/a/sheet.png`), not yet
+  traced; that run was built against another agent's uncommitted psxport presentation edits.
+- Arena capacity (reports `-154132`, `-154209`): margin sprites need about 384 more slots than the 1,000 of
+  `D_8015D9D0` (cap at `0x80026BB0`, followed by the VRAM rect queue `0x801659D0`). Growing it into guest RAM needs a
+  span proven unused (no heap map yet: the libc heap is `0x80175F3C`+`0x820C8`). The other route is a record-path
+  seam that appends host-owned packets to an ordering-table bucket, which is psxport presentation, owned by the
+  Spyro agent at the moment, so it is reported rather than built here.
