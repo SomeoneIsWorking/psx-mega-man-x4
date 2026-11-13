@@ -18,7 +18,7 @@ Vendored as `external/mmx4` (submodule, pinned `1922fcd3`).
 | kind | *matching* decomp: its source is meant to build to byte-identical objects | its own splat/objdiff pipeline |
 | overlays | **declares exactly ONE code segment and no overlays** | `config/SLUS_005.61.splat.yaml`: 155 subsegments, one code segment `main` at vram `0x80010000`, bss `0x8012F418 + 0x46B20` |
 | activity | **active** — upstream `main` at `a40132e8`, pushed 2026-10-13, ~400 PRs since our `1922fcd3` pin; now also configs for JP `SLPS_009.02` and EU `SLES_011.76` and a PC build (`src/pc`, Psy-Z) | GitHub API `pushed_at` and commit list, 2026-10-13 |
-| progress | **60.85% on decomp.dev** (2026-10-13; was 18.5% at the pin) | NOT measured here, and NOT this port's number — see below |
+| progress | **87.34% on decomp.dev** (2026-11-13, upstream `9b7c3f80`; was 18.5% at the pin) | NOT measured here, and NOT this port's number — see below |
 
 The USER's ruling (2026-08-12) is that licensing is not a constraint on this repo: *"Licensing isn't an
 issue, you can use whatever license needed."* So mmx4 may be used for **code and ideas**, and this repo
@@ -64,7 +64,7 @@ legitimate reason to lift one. Details and the sparse-checkout recipe: `LICENSIN
   SBS byte-exact RAM parity. **Neither implies the other, and quoting one as evidence about the other is
   how a port looks finished while nothing is gated.** Nothing in this repo may cite that percentage as
   this port's progress.
-- **It is a PARTIAL supply, and our pin is stale.** Upstream is active (60.85% on 2026-10-13); the pin
+- **It is a PARTIAL supply, and our pin is stale.** Upstream is active (87.34% on 2026-11-13); the pin
   `1922fcd3` predates most of it. Re-extract each module from our disc and compare against `check.<variant>.txt` after moving the pin.
 - **Nothing has been read.** As of 2026-08-12 no AGPL source from it has been read in this repo — only
   its build config (splat yaml, `check.us.txt`, `extract.sh`) and its LICENSE header. The containment
