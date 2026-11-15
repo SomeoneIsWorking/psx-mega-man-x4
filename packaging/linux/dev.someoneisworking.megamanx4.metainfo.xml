@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>dev.someoneisworking.megamanx4</id>
+  <name>Mega Man X4</name>
+  <summary>PC-native port of Mega Man X4</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>AGPL-3.0-or-later</project_license>
+  <description>
+    <p>PC-native port of Mega Man X4. The original game is not included: the first launch asks for the
+      player's own disc image.</p>
+  </description>
+  <launchable type="desktop-id">dev.someoneisworking.megamanx4.desktop</launchable>
+  <provides>
+    <binary>megamanx4_port</binary>
+  </provides>
+  <categories>
+    <category>Game</category>
+    <category>ActionGame</category>
+  </categories>
+</component>
