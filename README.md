@@ -1,8 +1,8 @@
 # Mega Man X4 — a PC-native enhancement port
 
 A PC-native port of **Mega Man X4** (PS1, USA, `SLUS_005.61`) built on the
-[psxport](https://github.com/SomeoneIsWorking/psxport), using native title subsystems plus runtime
-Lightrec translation of the authenticated executable.
+[psxport](https://github.com/SomeoneIsWorking/psxport), using native title subsystems plus psxport's
+interpreter running the authenticated executable.
 
 ## Screenshots
 
@@ -74,8 +74,8 @@ package managers itself.
 
 ## Legal
 
-**No game content is distributed here.** The disc image, the executable extracted from it and the
-runtime JIT cache derived from it are all yours and are gitignored.
+**No game content is distributed here.** The disc image and the executable extracted from it are
+yours and are gitignored.
 
 ### Licensing
 

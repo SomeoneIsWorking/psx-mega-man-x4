@@ -1,9 +1,9 @@
 # Mega Man X4 port
 
-The USA `SLUS_005.61` enhancement port. The authenticated executable is runtime data;
-`external/psxport` owns PSX and Lightrec execution, while this repository owns title identity,
-measured native behavior, and widescreen, loading removal, drop-in/drop-out X/Zero co-op and
-skippable dialogue and sequences. Framework contract: `external/psxport/AGENTS.md`; workspace:
+The USA `SLUS_005.61` enhancement port. The authenticated executable is runtime data; `external/psxport`
+owns PSX and guest execution (its per-`Core` interpreter, `GuestExecutor`), while this repository owns
+title identity, measured native behavior, and widescreen, loading removal, drop-in/drop-out X/Zero co-op
+and skippable dialogue and sequences. Framework contract: `external/psxport/AGENTS.md`; workspace:
 `../AGENTS.md`. `docs/features.md` traces each player-visible feature through its owners.
 
 ## Title boundaries
@@ -59,5 +59,5 @@ Every directory under `game/` owns one subsystem (`runtime`, `debug`, `frame`, `
   external/psxport/tools/port/consumer_build.py --build build/agent --target megamanx4_port`.
 - `tools/live_play.py` and `tools/title_prompts.py` drive a headless run over the control channel:
   input, front-end state, presents, and frame captures.
-- A past native run is not Lightrec gameplay evidence. Verify the shipping dispatcher, including a
-  reached native override and its scoped original call, before claiming dynarec behavior.
+- A past native run is not interpreter gameplay evidence. Verify the shipping dispatcher, including a
+  reached native override and its scoped original call, before claiming executor behavior.
