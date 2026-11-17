@@ -22,7 +22,7 @@ Frame loop: owned. `x4::frame::FrameDriver` runs one iteration of gameMain `0x80
 | `bios_threads::Service` | `game/execution/bios_threads.*` | OpenTh/ChangeTh/CloseTh under the retail scheduler; a task's ChangeTh to main ends its turn as a typed `CooperativeYield`, so each turn gets one field of budget; retail `UpdateTasks` on its own fiber so an over-budget task parks it mid-loop (`runUpdateTasks`, `frameInProgress`); each task fiber keeps its own native nesting, so guest interrupts reach task code (`resumeFiber`, psxport issue 0202); a task parked between turns is its registers plus `resumePc`, saved in the machine state and resumed on a fresh fiber |
 | `pad` constants | `game/input/pad_layout.h` | The two InitPAD receive buffers |
 | `input_path::observeField` | `game/input/input_path.*` | Read-only per-field trace of a pad edge (`x4-input-path` channel) |
-| `SequenceSkip` | `game/input/sequence_skip*.*` | Start held in the Hunter H.Q. briefing pages it through the pad route `0x80012328` |
+| `SequenceSkip` | `game/input/sequence_skip*.*` | Start held in any dialogue (abc_object `0x8013BC34`, updated by `0x80022730`) pages it through the pad route `0x80012328` |
 | `cd_controller` | `game/media/cd_controller.*` | Controller reset, libcd command-state clear, published mode |
 | `cd_control_boundary` | `game/media/cd_control_boundary.*` | `CdControlB(Pause)` through the synchronous CD owner |
 | `startup_cd` | `game/media/startup_cd.*` | The setup transaction at `0x80013588` |

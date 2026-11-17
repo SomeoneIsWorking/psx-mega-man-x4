@@ -37,11 +37,11 @@ deviation, grouped by affect. `tools/behavior.py` = view · `... <words>` = sear
 - **affect:** full
 - **status:** implemented
 - **flag:** PSXPORT_X4_SKIP (read via psx::config::enh(x4::skipCvar()))
-- **original:** the Hunter H.Q. briefing shows each message page until the player presses Cross, then loads the stage
-- **altered:** while Start is held in the briefing the guest's Cross edge is raised every fourth field, so the retail briefing owner runs every page and reaches the stage start itself (about 100 fields instead of about 1,100 with a Cross tap per page)
+- **original:** every dialogue box (the Hunter H.Q. briefing, engine state 3 sub-state 10, and the in-stage dialogues 0x80021D20 runs) types each page and waits for a face-button edge before the next
+- **altered:** while Start is held in a dialogue the guest's Cross edge is raised every fourth field, so the retail dialogue owner runs every page to its end (the briefing reaches the stage start in about 100 fields instead of about 1,100 with a Cross tap per page)
 - **guard:** force-suppressed by psx::config::enh() in typed comparison runs, and the pad route override reads it before touching a guest word
 - **owner:** game/input/sequence_skip.cpp
-- **notes:** The end state is the one the retail route leaves: engine, misc, item and entity blocks were byte-identical to the Cross-tap route at the first controllable field of stage 1 (the player's animation counter differs by the sub-field alignment). Only the briefing is covered; the other sequences are listed in `docs/project-state.md` S011 as not done.
+- **notes:** The end state is the one the retail route leaves: engine, misc, item and entity blocks were byte-identical to the Cross-tap route at the first controllable field of stage 1 (the player's animation counter differs by the sub-field alignment). The gate is the dialogue update's own active byte (abc_object +0xC, 0x8013BC34), so every caller of 0x80022730 is covered; the other sequences are listed in `docs/project-state.md` S011.
 
 ## widescreen
 - **class:** pc_enh

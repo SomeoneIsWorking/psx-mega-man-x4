@@ -26,7 +26,7 @@ no row runs on the framework alone.
 | hop | joins | owner |
 |---|---|---|
 | 1 | psxport F-INPUT.1 | `game/runtime/runtime.cpp:x4::Runtime::deliverPad` — `StockPadBuffers` at `0x80166D68`/`0x8012F46C` |
-| 2 | psxport F-INPUT.1 | `game/input/sequence_skip_overrides.cpp:registerOverrides` — Start held in the Hunter H.Q. briefing raises the guest's Cross edge |
+| 2 | psxport F-INPUT.1 | `game/input/sequence_skip_overrides.cpp:registerOverrides` — Start held in any dialogue raises the guest's Cross edge |
 | 3 | psxport F-INPUT.1 | `game/runtime/runtime.cpp:x4::Runtime::padPorts` — two controller ports while `PSXPORT_X4_COOP` is on; the second controller (or `p2` on the control channel's pad verbs) is port 2 |
 | 4 | — | `game/coop/coop.cpp:x4::coop::Coop::tick` — a pad-2 Start edge (`0x80166D54`) joins or leaves player 2; player 2's pass, draw, hit retries and the midpoint camera (`docs/plans/0046-drop-in-co-op.md`) |
 

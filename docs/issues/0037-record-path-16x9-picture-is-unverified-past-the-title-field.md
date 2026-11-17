@@ -6,7 +6,7 @@ symptom: Stage 1 shows widened background, objects and HUD at 16:9; fades over c
 tags: widescreen,record,evidence
 state_items: S006
 created: 2026-10-07
-updated: 2026-10-10
+updated: 2026-11-17
 ---
 
 ## What is measured
@@ -30,7 +30,7 @@ design.
 - Margin content from widened 3D or culled-in objects: no reachable frame draws any.
 - HUD placement: no HUD is reachable. The record path does not move guest 2D; a HUD element that must
   anchor to the 16:9 edges needs a title producer.
-- Fades over content, the title menu and the white logo quad (`title_quad`, authored 320 wide).
+- The title menu and the white logo quad (`title_quad`, authored 320 wide).
 - 2D background layers at the margins in gameplay: if the stage BG draws only the 320-column window,
   the margins will show partial tiles or black.
 
@@ -62,6 +62,11 @@ recordcheck mismatched=0 (3,477 presents through the stage), and the gameplay bl
 
 ## Still unmeasured
 
-- Fades over content: they are 320-wide guest quads, so the margins are not faded.
 - Stages after the first, boss gauges on the right edge, 21:9 (the ring caps the margin at 80 px).
 - The title menu and the white logo quad.
+
+## Fades, 2026-11-17
+
+Measured: the stage fade-in after `warp 1/0/0` at 16:9 (`ires=0`, sink 3840x2160, presents 1209-1245) darkens the
+margins with the centre at every step; the column luminance profile has no step at the 4:3 edge
+(`scratch/gaps/fade-before/`). The fade is the task `0x80012A3C`'s subtractive 320x240 tile.

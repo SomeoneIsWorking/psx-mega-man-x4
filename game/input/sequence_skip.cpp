@@ -3,17 +3,19 @@
 
 #include "core.h"
 #include "player_object.h"
+#include "stage_warp.h"
 
 namespace x4::sequence_skip {
 
-bool SequenceSkip::inBriefing(Core &core) {
-  return core.mem_r8(kEngineAddress + kEngineStateOffset) == kBriefingState &&
-         core.mem_r8(kEngineAddress + kEngineSubStateOffset) == kBriefingSubState;
+bool SequenceSkip::inDialogue(Core &core) {
+  const bool paused = core.mem_r8(StageWarp::kEngine + StageWarp::kStateOffset) == StageWarp::kInStage &&
+                      core.mem_r8(StageWarp::kEngine + StageWarp::kSubStateOffset) == kPauseMenu;
+  return core.mem_r8(kDialogueActive) != 0 && !paused;
 }
 
 void SequenceSkip::afterPadRoute(Core &core) {
   const guest::PadLens pad(core, guest::kPadHeldP1);
-  if (!inBriefing(core) || (pad.held() & kStartMask) == 0) {
+  if (!inDialogue(core) || (pad.held() & kStartMask) == 0) {
     fields_ = 0;
     return;
   }
