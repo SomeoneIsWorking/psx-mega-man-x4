@@ -62,6 +62,18 @@ letting it play out.
 
 Contributing state: S011.
 
+## G006 — Autosave and Continue
+
+Retail stops between stages to ask whether to save. Remove that prompt: at the same point the game
+saves on its own through its own save routine to the memory card, and a small autosave icon shows while
+the write runs. When a save exists, the title menu's first option is "Continue", selected by default, and
+it loads the newest save through the game's own load path; without a save the menu is unchanged.
+
+Success requires every between-stage save prompt found by RE and replaced, the autosave writing the same
+data a confirmed retail save writes, the icon on screen for each autosave, and "Continue" restoring that
+save's terminal state as the retail load would.
+
+
 ## Constraints and non-goals
 
 - Native rendering, native graphics producers, native depth, interpolation/lerp, and a synthetic
